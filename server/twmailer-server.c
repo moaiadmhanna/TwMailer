@@ -13,8 +13,7 @@ void listening(int sfd);
 int communication(int consfd, char *buffer, int buffersize);
 void accept_client(int sfd, int *peersoc);
 void receive_message(int peersoc, char *buffer, int buflen);
-
-
+void handle_send_message(char *send_obj[4]);
 
 int main(const int argc, char *argv[]){
     char* ip = argv[1];
@@ -78,9 +77,9 @@ int communication(int consfd, char *buffer, int buffersize)
     memset(buffer, 0, buffersize);
     int size, total = 0;
     while((size = recv(consfd, &buffer[total],buffersize,0)) > 0) {
-        printf("Received iteration %s with size %d \n", &buffer[total], size);
+        // printf("Received iteration %s with size %d \n", &buffer[total], size);
         total += size;
-        if (buffer[total - 3] == '.') {
+        if (total >= 3 && buffer[total - 3] == '.') {
             break; 
         }
     };
@@ -92,18 +91,27 @@ int communication(int consfd, char *buffer, int buffersize)
 
     char *tokens = strtok(buffer, "\n");
     trim(tokens);
-    printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
+    // printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
     if (tokens == NULL) {
         exit(EXIT_FAILURE);
     } 
     else if (strcmp(tokens, "SEND") == 0) 
     {
-        while(tokens != NULL){
-            printf("Received SEND \n");
-            printf("Reveiced Item after Send %s \n", tokens);
-            tokens = strtok(NULL, "\n"); /* call strtok here*/
+        printf("---------- SEND ----------- \n");
+        char *send_obj[4];
+        for(int i = 0; i < 4; i++){
+            if(tokens == NULL){
+                break;
+            }
+            tokens = strtok(NULL, "\n"); 
             trim(tokens);
+            printf("Reveiced %s \n", tokens);
+            send_obj[i] = tokens;
         }
+        for(int i = 0; i < 4; i++) {
+            printf("%s", send_obj[i]);
+        }
+        // handle_send_message(send_obj);
     } 
     else if (strcmp(tokens, "START") == 0) 
     {
@@ -136,11 +144,17 @@ void receive_message(int peersoc, char* buffer, int buflen){
 
 void trim(char *input)
 {
+    if(input == NULL) return;
     int len = strlen(input);
-    if (input[len - 1] == '\r' || input[len - 1] == '\n') {
+    if (input[len - 1] == '\r' || input[len - 1] == '\n' || input[len - 1] == ' ' || input[len - 1] == '.' ) {
         input[len - 1] = '\0';
     }
-    if (input[len - 2] == '\r' || input[len - 2] == '\n') {
+    if (input[len - 2] == '\r' || input[len - 2] == '\n' || input[len - 2] == ' ' || input[len - 2] == '.' ) {
         input[len - 2] = '\0';
     }
+
+}
+
+void handle_send_message(char *send_obj[4]){
+    
 }
