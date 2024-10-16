@@ -6,8 +6,43 @@
 #include <unistd.h>
 #include <string.h>
 
-void create_socket();
+void create_socket(int *sfd);
+void setup_socket(int sfd, struct sockaddr_in *serveraddr);
+void trim(char *input) void listening(int sfd);
+int communication(int consfd, char *buffer, int buffersize);
+void accept_client(int sfd, int *peersoc);
+void receive_message(int peersoc, char *buffer, int buflen);
 
+
+
+int main(const int argc, char *argv[]){
+    char* ip = argv[1];
+    char* port = argv[2];
+
+    int sfd;
+    create_socket(&sfd);
+
+    struct sockaddr_in serveraddr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(atoi(port)),
+            .sin_addr.s_addr = INADDR_ANY
+    };
+
+    inet_aton(ip, &serveraddr.sin_addr);
+    setup_socket(sfd, &serveraddr);
+    listening(sfd);
+
+    int peersoc; // Socket of client
+    int buflen = 50;
+    char buffer[buflen];
+    while(1)
+    {
+        accept_client(sfd, &peersoc); 
+        receive_message(peersoc,buffer,buflen); 
+    }
+
+    close(sfd); 
+}
 void create_socket(int *sfd){
     *sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (*sfd == -1) {
@@ -46,20 +81,18 @@ int communication(int consfd, char *buffer, int buffersize)
         total += size;
         if (buffer[total - 1] == '\n') {
             break; 
-
     }
     };
     if(size == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
-    printf("received %s \n", buffer);
     send(consfd, "OK\n", 3, 0);
     /* TODO:
         Call strtok to spilt up the received string (initial call);
      */
-    char *tokens = strtok(buffer, NULL);
-    trim(tokens);
+    // char *tokens = strtok(buffer, NULL);
+    // trim(tokens);
     // printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
     // if (tokens == NULL) {
     //     exit(EXIT_FAILURE);
@@ -97,31 +130,13 @@ void receive_message(int peersoc, char* buffer, int buflen){
     while(communication(peersoc,buffer,buflen) == 0);
 }
 
-int main(const int argc, char *argv[]){
-    char* ip = argv[1];
-    char* port = argv[2];
-
-    int sfd;
-    create_socket(&sfd);
-
-    struct sockaddr_in serveraddr = {
-            .sin_family = AF_INET,
-            .sin_port = htons(atoi(port)),
-            .sin_addr.s_addr = INADDR_ANY
-    };
-
-    inet_aton(ip, &serveraddr.sin_addr);
-    setup_socket(sfd, &serveraddr);
-    listening(sfd);
-
-    int peersoc; // Socket of client
-    int buflen = 50;
-    char buffer[buflen];
-    while(1)
-    {
-        accept_client(sfd, &peersoc); 
-        receive_message(peersoc,buffer,buflen); 
+void trim(char *input)
+{
+    int len = strlen(input);
+    if (input[len - 1] == '\r' || input[len - 1] == '\n') {
+        input[len - 1] = '\0';
     }
-
-    close(sfd); 
+    if (input[len - 2] == '\r' || input[len - 2] == '\n') {
+        input[len - 2] = '\0';
+    }
 }
