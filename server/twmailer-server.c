@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <string.h>
 
 void create_socket();
 
@@ -37,6 +38,45 @@ void listening(int sfd){
     }
     printf("Server is listining");
 }
+int communication(int consfd, char *buffer, int buffersize)
+{
+    memset(buffer, 0, buffersize);
+    int size, total = 0;
+    while((size = recv(consfd,buffer,buffersize,0)) > 0) {
+        printf("Received iteration %s with size %d \n", &buffer[total], size);
+        total += size;
+    };
+    if(size == -1) {
+        printf("cannot receive due to %d \n", errno);
+        exit(EXIT_FAILURE);
+    }
+    printf("received %s \n", buffer);
+    send(consfd, "OK\n", 3, 0);
+    /* TODO:
+        Call strtok to spilt up the received string (initial call);
+     */
+    // char *tokens = /* TODO call strtok here */
+    // trim(tokens);
+    // printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
+    // if (tokens == NULL) {
+    //     exit(EXIT_FAILURE);
+    // } else if (strcmp(tokens, "VOTE") == 0) {
+    //     printf("Received VOTE \n");
+    //     /* TODO
+    //         Call strtok for next split iteration
+    //      */
+    //     tokens = /* call strtok here*/
+    //     trim(tokens);
+    //     printf("Reveiced Item after Vote %s \n", tokens);
+    // } else if (strcmp(tokens, "START") == 0) {
+    //     printf("Received START\n");
+    // } else if (strcmp(tokens, "END") == 0) {
+    //     printf("end connection with client. \n");
+    //     close(consfd);
+    //     return 1;
+    // }
+    return 0;
+}
 
 void accept_client(int sfd, int* peersoc){
     struct sockaddr client;
@@ -49,17 +89,11 @@ void accept_client(int sfd, int* peersoc){
     printf("Accepted with filedescriptor of requesting socket %d \n", *peersoc);
 }
 
-int receive_message(int peersoc){
-    int buflen = 50;
-    char buffer[buflen];
-    int size = recv(peersoc, &buffer, buflen - 1, 0);
-    printf("Message received %s with length %d \n.", buffer, size);
-    return size;
-}
-
-void send_message(int peersoc, int* size){
-    char *response = "OK \n";
-    *size = send(peersoc, response, sizeof(response), 0);    
+void receive_message(int peersoc, char* buffer, int buflen){
+    // int size = recv(peersoc, &buffer, buflen - 1, 0);
+    // printf("Message received %s with length %d \n.", buffer, size);
+    buffer[0] = '\0';
+    while(communication(peersoc,buffer,buflen) == 0);
 }
 
 int main(const int argc, char *argv[]){
@@ -80,10 +114,13 @@ int main(const int argc, char *argv[]){
     listening(sfd);
 
     int peersoc; // Socket of client
-    accept_client(sfd, &peersoc);
-
-    int size_of_message= receive_message(peersoc);
-    send_message(peersoc, &size_of_message);
+    int buflen = 50;
+    char buffer[buflen];
+    while(1)
+    {
+        accept_client(sfd, &peersoc); 
+        receive_message(peersoc,buffer,buflen); 
+    }
 
     close(sfd); 
 }
