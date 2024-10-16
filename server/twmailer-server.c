@@ -33,18 +33,21 @@ void setup_socket(int sfd, struct sockaddr_in* serveraddr){
 void listening(int sfd){
     int constat = listen(sfd, 6);
     if (constat == -1) {
-        printf("Connection could not be established. Socket is unable to accept new connections. %d", errno);
+        printf("Connection could not be established. Socket is unable to accept new connections.\n %d", errno);
         exit(EXIT_FAILURE);
     }
-    printf("Server is listining");
 }
 int communication(int consfd, char *buffer, int buffersize)
 {
     memset(buffer, 0, buffersize);
     int size, total = 0;
-    while((size = recv(consfd,buffer,buffersize,0)) > 0) {
+    while((size = recv(consfd, &buffer[total],buffersize,0)) > 0 ) {
         printf("Received iteration %s with size %d \n", &buffer[total], size);
         total += size;
+        if (buffer[total - 1] == '\n') {
+            break; 
+
+    }
     };
     if(size == -1) {
         printf("cannot receive due to %d \n", errno);
@@ -55,8 +58,8 @@ int communication(int consfd, char *buffer, int buffersize)
     /* TODO:
         Call strtok to spilt up the received string (initial call);
      */
-    // char *tokens = /* TODO call strtok here */
-    // trim(tokens);
+    char *tokens = strtok(buffer, NULL);
+    trim(tokens);
     // printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
     // if (tokens == NULL) {
     //     exit(EXIT_FAILURE);
@@ -90,8 +93,6 @@ void accept_client(int sfd, int* peersoc){
 }
 
 void receive_message(int peersoc, char* buffer, int buflen){
-    // int size = recv(peersoc, &buffer, buflen - 1, 0);
-    // printf("Message received %s with length %d \n.", buffer, size);
     buffer[0] = '\0';
     while(communication(peersoc,buffer,buflen) == 0);
 }
