@@ -64,14 +64,14 @@ void send_message(int peersoc, int* size){
 
 int main(const int argc, char *argv[]){
     char* ip = argv[1];
-    // char* port = argv[2];
+    char* port = argv[2];
 
     int sfd;
     create_socket(&sfd);
 
     struct sockaddr_in serveraddr = {
             .sin_family = AF_INET,
-            .sin_port = htons(8888),
+            .sin_port = htons(atoi(port)),
             .sin_addr.s_addr = INADDR_ANY
     };
 
