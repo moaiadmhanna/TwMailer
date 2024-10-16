@@ -8,7 +8,8 @@
 
 void create_socket(int *sfd);
 void setup_socket(int sfd, struct sockaddr_in *serveraddr);
-void trim(char *input) void listening(int sfd);
+void trim(char *input);
+void listening(int sfd);
 int communication(int consfd, char *buffer, int buffersize);
 void accept_client(int sfd, int *peersoc);
 void receive_message(int peersoc, char *buffer, int buflen);
@@ -76,41 +77,44 @@ int communication(int consfd, char *buffer, int buffersize)
 {
     memset(buffer, 0, buffersize);
     int size, total = 0;
-    while((size = recv(consfd, &buffer[total],buffersize,0)) > 0 ) {
+    while((size = recv(consfd, &buffer[total],buffersize,0)) > 0) {
         printf("Received iteration %s with size %d \n", &buffer[total], size);
         total += size;
-        if (buffer[total - 1] == '\n') {
+        if (buffer[total - 3] == '.') {
             break; 
-    }
+        }
     };
     if(size == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
     send(consfd, "OK\n", 3, 0);
-    /* TODO:
-        Call strtok to spilt up the received string (initial call);
-     */
-    // char *tokens = strtok(buffer, NULL);
-    // trim(tokens);
-    // printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
-    // if (tokens == NULL) {
-    //     exit(EXIT_FAILURE);
-    // } else if (strcmp(tokens, "VOTE") == 0) {
-    //     printf("Received VOTE \n");
-    //     /* TODO
-    //         Call strtok for next split iteration
-    //      */
-    //     tokens = /* call strtok here*/
-    //     trim(tokens);
-    //     printf("Reveiced Item after Vote %s \n", tokens);
-    // } else if (strcmp(tokens, "START") == 0) {
-    //     printf("Received START\n");
-    // } else if (strcmp(tokens, "END") == 0) {
-    //     printf("end connection with client. \n");
-    //     close(consfd);
-    //     return 1;
-    // }
+
+    char *tokens = strtok(buffer, "\n");
+    trim(tokens);
+    printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
+    if (tokens == NULL) {
+        exit(EXIT_FAILURE);
+    } 
+    else if (strcmp(tokens, "SEND") == 0) 
+    {
+        while(tokens != NULL){
+            printf("Received SEND \n");
+            printf("Reveiced Item after Send %s \n", tokens);
+            tokens = strtok(NULL, "\n"); /* call strtok here*/
+            trim(tokens);
+        }
+    } 
+    else if (strcmp(tokens, "START") == 0) 
+    {
+        printf("Received START\n");
+    } 
+    else if (strcmp(tokens, "END") == 0) 
+    {
+        printf("end connection with client. \n");
+        close(consfd);
+        return 1;
+    }
     return 0;
 }
 
