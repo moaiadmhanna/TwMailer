@@ -79,7 +79,7 @@ int communication(int consfd, char *buffer, int buffersize)
     while((size = recv(consfd, &buffer[total],buffersize,0)) > 0) {
         // printf("Received iteration %s with size %d \n", &buffer[total], size);
         total += size;
-        if (total >= 3 && buffer[total - 3] == '.') {
+        if (buffer[total - size] == '.' && size == 3) {
             break; 
         }
     };
@@ -98,20 +98,19 @@ int communication(int consfd, char *buffer, int buffersize)
     else if (strcmp(tokens, "SEND") == 0) 
     {
         printf("---------- SEND ----------- \n");
-        char *send_obj[4];
-        for(int i = 0; i < 4; i++){
+        char *send_obj[5]  = {'\0'};
+        for(int i = 0; i < 5; i++){
+            tokens = strtok(NULL, "\n"); 
             if(tokens == NULL){
                 break;
             }
-            tokens = strtok(NULL, "\n"); 
             trim(tokens);
             printf("Reveiced %s \n", tokens);
-            send_obj[i] = tokens;
+            if(strcmp(tokens,".") != 0)
+                send_obj[i] = tokens;
         }
-        for(int i = 0; i < 4; i++) {
-            printf("%s", send_obj[i]);
-        }
-        // handle_send_message(send_obj);
+
+        handle_send_message(send_obj);
     } 
     else if (strcmp(tokens, "START") == 0) 
     {
@@ -146,15 +145,27 @@ void trim(char *input)
 {
     if(input == NULL) return;
     int len = strlen(input);
-    if (input[len - 1] == '\r' || input[len - 1] == '\n' || input[len - 1] == ' ' || input[len - 1] == '.' ) {
+    if (input[len - 1] == '\r' || input[len - 1] == '\n' || input[len - 1] == ' ') {
         input[len - 1] = '\0';
     }
-    if (input[len - 2] == '\r' || input[len - 2] == '\n' || input[len - 2] == ' ' || input[len - 2] == '.' ) {
+    if (input[len - 2] == '\r' || input[len - 2] == '\n' || input[len - 2] == ' ' ) {
         input[len - 2] = '\0';
     }
-
 }
 
-void handle_send_message(char *send_obj[4]){
-    
+void handle_send_message(char *send_obj[4])
+{
+    for(int i = 0; i < 4; i++)
+    {
+        if(send_obj[i] == NULL)
+        {
+            printf("Message Object is not Complete");
+            exit(EXIT_FAILURE);
+            return;
+        }
+    }
+    printf("Sender : %s \n", send_obj[0]);
+    printf("Receiver : %s \n", send_obj[1]);
+    printf("Subject : %s \n", send_obj[2]);
+    printf("Message : %s \n", send_obj[3]);
 }
