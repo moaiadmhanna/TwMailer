@@ -228,29 +228,36 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir)
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
-    char *current_user = "Muayad";
+    char *current_user = "Duayad";
     char *receiver_path = malloc(strlen(mail_dir) + strlen(current_user) + 2); // +2 for slash and null terminator
-
     sprintf(receiver_path, "%s/%s", mail_dir, current_user);
+    
     char **messages = list_message(receiver_path);
-
     int count = 0;
-    while (messages[count] != NULL)
-        count++;
+    if (messages != NULL) {
+        while (messages[count] != NULL) {
+            count++;
+        }
+    }
 
-    char *number_of_messages = malloc(sizeof(int) * count + strlen("Messages"));
+    char *number_of_messages = malloc(sizeof(int) * (count > 0 ? count:1) + strlen("Messages"));
     sprintf(number_of_messages, "%d Messages", count);
     send_client(number_of_messages, consfd);
-
-    // Speicher freigeben
-    for(int i = 0; messages[i] != NULL; i++){
-        char* message = malloc(sizeof(int) + strlen(messages[i]));
-        sprintf(message, "%d: %s", i + 1, messages[i]);
-        send_client(message, consfd);
-        free(message);
-    }
-    free(receiver_path);
     free(number_of_messages);
+
+
+     if (messages != NULL) {
+        for (int i = 0; messages[i] != NULL; i++) {
+            int message_len = snprintf(NULL, 0, "%d: %s", i + 1, messages[i]) + 1;
+            char *message = malloc(message_len);
+            snprintf(message, message_len, "%d: %s", i + 1, messages[i]);
+            send_client(message, consfd);
+            free(message);
+        }
+    }
+
+    free(receiver_path);
+    free(messages);
 
 }
 
