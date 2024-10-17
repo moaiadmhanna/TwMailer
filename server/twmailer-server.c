@@ -33,11 +33,14 @@ void handle_read_message(char *buffer,int consfd, char* mail_dir);
 void handle_quit_message(char *buffer, int consfd, char* mail_dir);
 void send_client(char *message, int consfd);
 void save_message(Mail_Body mail_body, int consfd, char* mail_dir);
+char** list_message(char* receiver_path);
 
 typedef struct {
     char* name;
     void (*func)(char*, int, char*);
 } option;
+
+
 
 option options[] = {
     {"SEND", handle_send_client},
@@ -229,32 +232,49 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir)
     char *receiver_path = malloc(strlen(mail_dir) + strlen(current_user) + 2); // +2 for slash and null terminator
 
     sprintf(receiver_path, "%s/%s", mail_dir, current_user);
-    // Check if the receiver's directory exists, create it if not
-    if (access(receiver_path, F_OK) != -1)
-    {
+    char **messages = list_message(receiver_path);
+
+    int count = 0;
+    while (messages[count] != NULL)
+        count++;
+
+    char *number_of_messages = malloc(sizeof(int) * count + strlen("Messages"));
+    sprintf(number_of_messages, "%d Messages", count);
+    send_client(number_of_messages, consfd);
+
+    // Speicher freigeben
+    for(int i = 0; messages[i] != NULL; i++){
+        char* message = malloc(sizeof(int) + strlen(messages[i]));
+        sprintf(message, "%d: %s", i + 1, messages[i]);
+        send_client(message, consfd);
+        free(message);
+    }
+    free(receiver_path);
+    free(number_of_messages);
+
+}
+
+char** list_message(char* receiver_path) {
+    char **messages = NULL;
+    if (access(receiver_path, F_OK) != -1) {
         struct dirent *dir;
-        DIR* d = opendir(receiver_path);
-        int cnt = 1;
+        DIR *d = opendir(receiver_path);
         if (d) {
-            while ((dir = readdir(d)) != NULL)
+            for (int cnt = 0; (dir = readdir(d)) != NULL; )
             {
-                printf("%d\n",dir->d_type);
-                if(dir->d_type == DT_REG){
-                    printf("%d: %s\n", cnt, dir->d_name);
+                if (dir->d_type == DT_REG) {
+                    char **temp = realloc(messages, (cnt + 1) * sizeof(char*));
+                    messages = temp;
+                    messages[cnt] = strdup(dir->d_name);
                     cnt++;
                 }
             }
             closedir(d);
-            if(cnt == 1)
-                printf("No fk messages 1\n");
-        }   
+        }
     }
-    else
-    {
-        printf("No fk messages\n");
-    }
-    
+    return messages;
 }
+
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir){
     printf("Del messages \n");
