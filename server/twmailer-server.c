@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#define BUFFER_SIZE 50
 
 void create_socket(int *sfd);
 void setup_socket(int sfd, struct sockaddr_in *serveraddr);
@@ -14,11 +15,11 @@ int communication(int consfd, char *buffer, int buffersize);
 void accept_client(int sfd, int *peersoc);
 void receive_message(int peersoc, char *buffer, int buflen);
 void handle_options(char *buffer, int consfd);
-void handle_send_message(char* tokens,int consfd);
-void handle_list_message(char* tokens,int consfd);
-void handle_del_message(char* tokens,int consfd);
-void handle_read_message(char* tokens,int consfd);
-void handle_quit_message(char* tokens, int consfd);
+void handle_send_message(char *buffer,int consfd);
+void handle_list_message(char *buffer,int consfd);
+void handle_del_message(char *buffer,int consfd);
+void handle_read_message(char *buffer,int consfd);
+void handle_quit_message(char *buffer, int consfd);
 
 typedef struct {
     char* name;
@@ -51,12 +52,11 @@ int main(const int argc, char *argv[]){
     listening(sfd);
 
     int peersoc; // Socket of client
-    int buflen = 50;
-    char buffer[buflen];
+    char buffer[BUFFER_SIZE];
     while(1)
     {
         accept_client(sfd, &peersoc); 
-        receive_message(peersoc,buffer,buflen); 
+        receive_message(peersoc,buffer,BUFFER_SIZE); 
     }
     close(sfd); 
     return 0;
@@ -93,20 +93,22 @@ void listening(int sfd){
 int communication(int consfd, char *buffer, int buffersize)
 {
     memset(buffer, 0, buffersize);
-    int size, total = 0;
-    while((size = recv(consfd, &buffer[total],buffersize,0)) > 0) {
-        // printf("Received iteration %s with size %d \n", &buffer[total], size);
-        total += size;
-        if (buffer[total - size] == '.' && size == 3) {
-            break; 
-        }
-    };
+    int size = 0;
+    size = recv(consfd, &buffer[0],buffersize,0);
     if(size == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
-    send(consfd, "OK\n", 3, 0);
-    handle_options(buffer,consfd);
+    char option[BUFFER_SIZE];
+    strcpy(option,buffer);
+    printf("Untrimed BUFFER: %s\n",buffer);
+    trim(option);
+    printf("BUFFER: %s\n",buffer);
+    for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
+        if(strcmp(option, options[i].name) == 0){
+            options[i].func(buffer, consfd);
+        }
+    }
     return 0;
 }
 
@@ -152,10 +154,24 @@ void handle_options(char *buffer,int consfd)
         }
     }
 }
-void handle_send_message(char* tokens, int consfd)
+void handle_send_message(char* buffer, int consfd)
 {
-    printf("---------- SEND ----------- \n");
+    int total,size = 0;
+    while((size = recv(consfd, &buffer[total],BUFFER_SIZE,0)) > 0) {
+        total += size;
+        if (buffer[total - size] == '.' && size == 3) {
+            break; 
+        }
+    };
+    char *tokens = strtok(buffer, "\n");
+    trim(tokens);
+    printf("TOKENS: %s",tokens);
+    if (tokens == NULL)
+    {
+        exit(EXIT_FAILURE);
+    } 
     char *send_obj[5]  = {'\0'};
+    printf("---------- SEND ----------- \n");
     for(int i = 0; i < 5; i++){
         tokens = strtok(NULL, "\n"); 
         if(tokens == NULL){
@@ -182,22 +198,23 @@ void handle_send_message(char* tokens, int consfd)
     send(consfd,"OK Message Received\n",21,0);
 }
 
-void handle_quit_message(char* tokens, int consfd){
+void handle_quit_message(char* buffer, int consfd){
     printf("end connection with client. \n");
     close(consfd);
+    exit(0);
 }
 
-void handle_list_message(char* tokens, int consfd){
+void handle_list_message(char* buffer, int consfd){
     printf("Hello list usernames \n");
 
 }
 
-void handle_del_message(char* tokens, int consfd){
+void handle_del_message(char* buffer, int consfd){
     printf("Del messages \n");
 
 }
 
-void handle_read_message(char* tokens, int consfd){
+void handle_read_message(char* buffer, int consfd){
     printf("Read messages \n");
 
 }
