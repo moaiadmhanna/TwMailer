@@ -1,7 +1,6 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <errno.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
@@ -77,6 +76,7 @@ int main(const int argc, char *argv[]){
     close(sfd); 
     return 0;
 }
+
 void create_socket(int *sfd){
     *sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (*sfd == -1) {
@@ -84,7 +84,6 @@ void create_socket(int *sfd){
         exit(EXIT_FAILURE);
     }
 }
-
 
 void setup_socket(int sfd, struct sockaddr_in* serveraddr){
     int enable = 1;
@@ -106,6 +105,7 @@ void listening(int sfd){
         exit(EXIT_FAILURE);
     }
 }
+
 int communication(int consfd, char *buffer, int buffersize, char* mail_dir)
 {
     memset(buffer, 0, buffersize);
@@ -211,15 +211,49 @@ void send_client(char* message, int consfd) {
     send(consfd, new, strlen(new), 0);
     free(new);
 }
+
 void handle_quit_message(char* buffer, int consfd, char* mail_dir){
     printf("End connection with client. \n");
     close(consfd);
     exit(0);
 }
 
-void handle_list_message(char* buffer, int consfd, char* mail_dir){
-   send_client("User lust", consfd);
+void handle_list_message(char* buffer, int consfd, char* mail_dir)
+{
+    int size = recv(consfd, &buffer[0],BUFFER_SIZE,0);
+    if(size == -1) {
+        printf("cannot receive due to %d \n", errno);
+        exit(EXIT_FAILURE);
+    }
+    char *current_user = "Muayad";
+    char *receiver_path = malloc(strlen(mail_dir) + strlen(current_user) + 2); // +2 for slash and null terminator
 
+    sprintf(receiver_path, "%s/%s", mail_dir, current_user);
+    // Check if the receiver's directory exists, create it if not
+    if (access(receiver_path, F_OK) != -1)
+    {
+        struct dirent *dir;
+        DIR* d = opendir(receiver_path);
+        int cnt = 1;
+        if (d) {
+            while ((dir = readdir(d)) != NULL)
+            {
+                printf("%d\n",dir->d_type);
+                if(dir->d_type == DT_REG){
+                    printf("%d: %s\n", cnt, dir->d_name);
+                    cnt++;
+                }
+            }
+            closedir(d);
+            if(cnt == 1)
+                printf("No fk messages 1\n");
+        }   
+    }
+    else
+    {
+        printf("No fk messages\n");
+    }
+    
 }
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir){
@@ -231,7 +265,6 @@ void handle_read_message(char* buffer, int consfd, char* mail_dir){
     printf("Read messages \n");
 
 }
-
 
 void save_message(Mail_Body mail_body, int consfd,  char* mail_dir) {
     FILE *fptr;
@@ -257,7 +290,7 @@ void save_message(Mail_Body mail_body, int consfd,  char* mail_dir) {
     }
 
     // Full file path
-    char *path = malloc(root_dir_len + dir_len + path_sender_len + sep_len + path_sub_len + type_len + 4); // +4 for slashes and null terminator
+    char *path = malloc(root_dir_len + dir_len + path_sender_len + sep_len + path_sub_len + type_len + 20); // +4 for slashes and null terminator
     sprintf(path, "%s/%s/%s-%s.txt", mail_dir, dirname, mail_body.sender, mail_body.subject);
 
     // When same file exists
