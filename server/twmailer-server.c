@@ -14,7 +14,6 @@ void listening(int sfd);
 int communication(int consfd, char *buffer, int buffersize);
 void accept_client(int sfd, int *peersoc);
 void receive_message(int peersoc, char *buffer, int buflen);
-void handle_options(char *buffer, int consfd);
 void handle_send_message(char *buffer,int consfd);
 void handle_list_message(char *buffer,int consfd);
 void handle_del_message(char *buffer,int consfd);
@@ -101,11 +100,9 @@ int communication(int consfd, char *buffer, int buffersize)
     }
     char option[BUFFER_SIZE];
     strcpy(option,buffer);
-    printf("Untrimed BUFFER: %s\n",buffer);
     trim(option);
-    printf("BUFFER: %s\n",buffer);
     for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
-        if(strcmp(option, options[i].name) == 0){
+        if(strcasecmp(option, options[i].name) == 0){
             options[i].func(buffer, consfd);
         }
     }
@@ -139,24 +136,10 @@ void trim(char *input)
         input[len - 2] = '\0';
     }
 }
-
-void handle_options(char *buffer,int consfd)
-{
-    char *tokens = strtok(buffer, "\n");
-    trim(tokens);
-    if (tokens == NULL)
-    {
-        exit(EXIT_FAILURE);
-    } 
-    for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
-        if(strcmp(tokens, options[i].name) == 0){
-            options[i].func(tokens, consfd);
-        }
-    }
-}
 void handle_send_message(char* buffer, int consfd)
 {
-    int total,size = 0;
+    int total = 0; 
+    int size = 0;
     while((size = recv(consfd, &buffer[total],BUFFER_SIZE,0)) > 0) {
         total += size;
         if (buffer[total - size] == '.' && size == 3) {
@@ -165,7 +148,6 @@ void handle_send_message(char* buffer, int consfd)
     };
     char *tokens = strtok(buffer, "\n");
     trim(tokens);
-    printf("TOKENS: %s",tokens);
     if (tokens == NULL)
     {
         exit(EXIT_FAILURE);
@@ -173,21 +155,21 @@ void handle_send_message(char* buffer, int consfd)
     char *send_obj[5]  = {'\0'};
     printf("---------- SEND ----------- \n");
     for(int i = 0; i < 5; i++){
+        if(strcmp(tokens,".") != 0)
+            send_obj[i] = tokens;
         tokens = strtok(NULL, "\n"); 
         if(tokens == NULL){
             break;
         }
         trim(tokens);
-        printf("Reveiced %s \n", tokens);
-        if(strcmp(tokens,".") != 0)
-            send_obj[i] = tokens;
     }
     for(int i = 0; i < 4; i++)
     {
         if(send_obj[i] == NULL)
         {
             printf("Message Object is not Complete\n");
-            // return Message send Confirmation to the Client
+            char* message = "Invalid Argument\n";
+            send(consfd,message,strlen(message),0);
             return;
         }
     }
@@ -195,7 +177,8 @@ void handle_send_message(char* buffer, int consfd)
     printf("Receiver : %s \n", send_obj[1]);
     printf("Subject : %s \n", send_obj[2]);
     printf("Message : %s \n", send_obj[3]);
-    send(consfd,"OK Message Received\n",21,0);
+    char* message = "OK Message sended\n";
+    send(consfd,message,strlen(message),0);
 }
 
 void handle_quit_message(char* buffer, int consfd){
