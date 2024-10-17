@@ -27,7 +27,7 @@ int communication(int consfd, char *buffer, int buffersize,char* mail_dir);
 void accept_client(int sfd, int *peersoc);
 void receive_message(int peersoc, char *buffer, int buflen, char* mail_dir);
 void handle_send_client(char *buffer,int consfd, char* mail_dir);
-void handle_list_message(char *buffer,int consfd, char* mail_dir);
+void handle_list_message(char* current_user,int consfd, char* mail_dir);
 void handle_del_message(char *buffer,int consfd, char* mail_dir);
 void handle_read_message(char *buffer,int consfd, char* mail_dir);
 void handle_quit_message(char *buffer, int consfd, char* mail_dir);
@@ -221,14 +221,14 @@ void handle_quit_message(char* buffer, int consfd, char* mail_dir){
     exit(0);
 }
 
-void handle_list_message(char* buffer, int consfd, char* mail_dir)
+void handle_list_message(char* current_user, int consfd, char* mail_dir)
 {
     int size = recv(consfd, &buffer[0],BUFFER_SIZE,0);
     if(size == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
-    char *current_user = "Duayad";
+    trim(current_user);
     char *receiver_path = malloc(strlen(mail_dir) + strlen(current_user) + 2); // +2 for slash and null terminator
     sprintf(receiver_path, "%s/%s", mail_dir, current_user);
     
