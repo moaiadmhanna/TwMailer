@@ -13,7 +13,27 @@ void listening(int sfd);
 int communication(int consfd, char *buffer, int buffersize);
 void accept_client(int sfd, int *peersoc);
 void receive_message(int peersoc, char *buffer, int buflen);
-void handle_send_message(char *send_obj[4]);
+void handle_options(char *buffer, int consfd);
+void handle_send_message(char *send_obj[4],int consfd);
+void handle_list_message(char *username[1] ,int consfd);
+void handle_del_message(char *del_obj[2],int consfd);
+void handle_read_message(char *read_obj[2],int consfd);
+void handle_quit_message(char *nothing[1],int consfd);
+
+typedef struct
+{
+    const char* name;
+    void(*func)(char**,int);
+} option
+
+option options[] = 
+{
+    {"SEND", handle_send_message},
+    {"LIST", handle_list_message},
+    {"DEL", handle_del_message},
+    {"READ", handle_read_message}
+    {"QUIT", handle_quit_message}
+}
 
 int main(const int argc, char *argv[]){
     char* ip = argv[1];
@@ -40,8 +60,8 @@ int main(const int argc, char *argv[]){
         accept_client(sfd, &peersoc); 
         receive_message(peersoc,buffer,buflen); 
     }
-
     close(sfd); 
+    return 0;
 }
 void create_socket(int *sfd){
     *sfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -88,40 +108,7 @@ int communication(int consfd, char *buffer, int buffersize)
         exit(EXIT_FAILURE);
     }
     send(consfd, "OK\n", 3, 0);
-
-    char *tokens = strtok(buffer, "\n");
-    trim(tokens);
-    // printf("Token received [%s] with size %d \n", tokens, (int)strlen(tokens));
-    if (tokens == NULL) {
-        exit(EXIT_FAILURE);
-    } 
-    else if (strcmp(tokens, "SEND") == 0) 
-    {
-        printf("---------- SEND ----------- \n");
-        char *send_obj[5]  = {'\0'};
-        for(int i = 0; i < 5; i++){
-            tokens = strtok(NULL, "\n"); 
-            if(tokens == NULL){
-                break;
-            }
-            trim(tokens);
-            printf("Reveiced %s \n", tokens);
-            if(strcmp(tokens,".") != 0)
-                send_obj[i] = tokens;
-        }
-
-        handle_send_message(send_obj);
-    } 
-    else if (strcmp(tokens, "START") == 0) 
-    {
-        printf("Received START\n");
-    } 
-    else if (strcmp(tokens, "END") == 0) 
-    {
-        printf("end connection with client. \n");
-        close(consfd);
-        return 1;
-    }
+    handle_options(buffer,consfd);
     return 0;
 }
 
@@ -153,14 +140,49 @@ void trim(char *input)
     }
 }
 
-void handle_send_message(char *send_obj[4])
+void handle_options(char *buffer,int consfd)
+{
+    char *tokens = strtok(buffer, "\n");
+    trim(tokens);
+    if (tokens == NULL)
+    {
+        exit(EXIT_FAILURE);
+    } 
+    else if(strcmp(tokens, "SEND") == 0) 
+    {
+        printf("---------- SEND ----------- \n");
+        char *send_obj[5]  = {'\0'};
+        for(int i = 0; i < 5; i++){
+            tokens = strtok(NULL, "\n"); 
+            if(tokens == NULL){
+                break;
+            }
+            trim(tokens);
+            printf("Reveiced %s \n", tokens);
+            if(strcmp(tokens,".") != 0)
+                send_obj[i] = tokens;
+        }
+
+        handle_send_message(send_obj,consfd);
+    } 
+    else if (strcmp(tokens, "START") == 0) 
+    {
+        printf("Received START\n");
+    } 
+    else if (strcmp(tokens, "END") == 0) 
+    {
+        printf("end connection with client. \n");
+        close(consfd);
+    }
+}
+void handle_send_message(char *send_obj[4], int consfd)
 {
     for(int i = 0; i < 4; i++)
     {
         if(send_obj[i] == NULL)
         {
-            printf("Message Object is not Complete");
-            exit(EXIT_FAILURE);
+            printf("Message Object is not Complete\n");
+            // return Message send Confirmation to the Client
             return;
         }
     }
@@ -168,4 +190,5 @@ void handle_send_message(char *send_obj[4])
     printf("Receiver : %s \n", send_obj[1]);
     printf("Subject : %s \n", send_obj[2]);
     printf("Message : %s \n", send_obj[3]);
+    send(consfd,"OK Message Received\n",21,0);
 }
