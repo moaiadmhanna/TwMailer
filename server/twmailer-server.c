@@ -223,7 +223,7 @@ void handle_quit_message(char* buffer, int consfd, char* mail_dir){
 
 void handle_list_message(char* current_user, int consfd, char* mail_dir)
 {
-    int size = recv(consfd, &buffer[0],BUFFER_SIZE,0);
+    int size = recv(consfd, &current_user[0],BUFFER_SIZE,0);
     if(size == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
@@ -262,26 +262,28 @@ void handle_list_message(char* current_user, int consfd, char* mail_dir)
 }
 
 char** list_message(char* receiver_path) {
-    char **messages = NULL;
-    if (access(receiver_path, F_OK) != -1) {
-        struct dirent *dir;
-        DIR *d = opendir(receiver_path);
-        if (d) {
-            for (int cnt = 0; (dir = readdir(d)) != NULL; )
-            {
-                if (dir->d_type == DT_REG) {
-                    char **temp = realloc(messages, (cnt + 1) * sizeof(char*));
-                    messages = temp;
-                    messages[cnt] = strdup(dir->d_name);
-                    cnt++;
-                }
+    char** messages = NULL;
+    struct dirent *dir;
+    DIR *d = opendir(receiver_path);
+    if (d) {
+        for (int cnt = 0; (dir = readdir(d)) != NULL; )
+        {
+            if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) continue;
+            int path_len = strlen(receiver_path) + strlen(dir->d_name) + 2; // +1 for '/', +1 for null terminator
+            char *full_path = malloc(path_len);  // Adjust size as needed
+            snprintf(full_path, path_len, "%s/%s", receiver_path, dir->d_name);
+            struct stat file_stat;
+            if (stat(full_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
+                char **temp = realloc(messages, (cnt + 1) * sizeof(char*));
+                messages = temp;
+                messages[cnt] = strdup(dir->d_name);
+                cnt++;
             }
-            closedir(d);
         }
+        closedir(d);
     }
     return messages;
 }
-
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir){
     printf("Del messages \n");
