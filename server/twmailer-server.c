@@ -34,6 +34,10 @@ void handle_quit_message(char *buffer, int consfd, char* mail_dir);
 void send_client(char *message, int consfd);
 void save_message(Mail_Body mail_body, int consfd, char* mail_dir);
 char** list_message(char* receiver_path);
+int get_messages_count(char **messages);
+char *get_receiver_path(char *mail_dir, char *current_user);
+void tokenize_message(char *buffer, char **send_obj, int times);
+void read_file(FILE *file, int consfd);
 
 typedef struct {
     char* name;
@@ -157,12 +161,12 @@ void trim(char *input)
     }
 }
 
-void tokenize_message(char* buffer, char** send_obj) {
+void tokenize_message(char* buffer, char** send_obj, int times) {
     char *tokens = strtok(buffer, "\n");
     trim(tokens);
     if (tokens == NULL)
         exit(EXIT_FAILURE);
-    for (int i = 0; i < 5 && tokens != NULL; i++) {
+    for (int i = 0; i < times && tokens != NULL; i++) {
         trim(tokens);
         send_obj[i] = tokens;
         tokens = strtok(NULL, "\n");
@@ -183,7 +187,7 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir)
 
     // Tokenize Message
     char *send_obj[5]  = {'\0'};
-    tokenize_message(buffer, send_obj);
+    tokenize_message(buffer, send_obj, 5);
    
     for(int i = 0; send_obj[i] != NULL; i++)
     {
@@ -221,23 +225,41 @@ void handle_quit_message(char* buffer, int consfd, char* mail_dir){
     exit(0);
 }
 
-void handle_list_message(char* current_user, int consfd, char* mail_dir)
+int get_messages_count(char** messages){
+    int count = 0;
+    while (messages[count] != NULL) {
+        count++;
+    }
+    return count;
+}
+
+char* get_receiver_path(char* mail_dir, char* current_user){
+    trim(current_user);
+    char *receiver_path = malloc(strlen(mail_dir) + strlen(current_user) + 2); // +2 for slash and null terminator
+    sprintf(receiver_path, "%s/%s", mail_dir, current_user);
+    return receiver_path;
+}
+
+char* get_full_path(char* root, char* fileName){
+    char *path = malloc(strlen(root) + strlen(fileName) + 20); // +4 for slashes and null terminator
+    sprintf(path, "%s/%s", root, fileName);
+    return path;
+}
+
+
+void handle_list_message(char* buffer, int consfd, char* mail_dir)
 {
-    int size = recv(consfd, &current_user[0],BUFFER_SIZE,0);
+    int size = recv(consfd, &buffer[0],BUFFER_SIZE,0);
     if(size == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
-    trim(current_user);
-    char *receiver_path = malloc(strlen(mail_dir) + strlen(current_user) + 2); // +2 for slash and null terminator
-    sprintf(receiver_path, "%s/%s", mail_dir, current_user);
-    
+    char *receiver_path = get_receiver_path(mail_dir, buffer);
+
     char **messages = list_message(receiver_path);
     int count = 0;
     if (messages != NULL) {
-        while (messages[count] != NULL) {
-            count++;
-        }
+        count = get_messages_count(messages);
     }
 
     char *number_of_messages = malloc(sizeof(int) * (count > 0 ? count:1) + strlen("Messages"));
@@ -264,9 +286,10 @@ void handle_list_message(char* current_user, int consfd, char* mail_dir)
 char** list_message(char* receiver_path) {
     char** messages = NULL;
     struct dirent *dir;
+    int cnt = 0;
     DIR *d = opendir(receiver_path);
     if (d) {
-        for (int cnt = 0; (dir = readdir(d)) != NULL; )
+        while ((dir = readdir(d)) != NULL)
         {
             if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) continue;
             int path_len = strlen(receiver_path) + strlen(dir->d_name) + 2; // +1 for '/', +1 for null terminator
@@ -282,8 +305,11 @@ char** list_message(char* receiver_path) {
         }
         closedir(d);
     }
+    if(cnt != 0)
+        messages[cnt] = NULL;
     return messages;
 }
+
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir){
     printf("Del messages \n");
@@ -291,8 +317,38 @@ void handle_del_message(char* buffer, int consfd, char* mail_dir){
 }
 
 void handle_read_message(char* buffer, int consfd, char* mail_dir){
-    printf("Read messages \n");
+    int size = recv(consfd, &buffer[0],BUFFER_SIZE,0);
+    size = recv(consfd, &buffer[size],BUFFER_SIZE,0);
+    if(size == -1) {
+        printf("cannot receive due to %d \n", errno);
+        exit(EXIT_FAILURE);
+    }
+    char *send_obj[2]  = {'\0'};
+    tokenize_message(buffer, send_obj, 2);
 
+    char *receiver_path = get_receiver_path(mail_dir, send_obj[0]);
+    char **messages = list_message(receiver_path);
+
+    char* full_path = get_full_path(receiver_path, messages[atoi(send_obj[1] - 1)]);
+
+    FILE* file = fopen(full_path, "r");
+    read_file(file, consfd);
+    free(messages);
+    free(full_path);
+}
+
+void read_file(FILE* file, int consfd){
+    char line[256];
+    if (file != NULL) {
+        while (fgets(line, sizeof(line), file)) {
+            send_client(line, consfd);
+        }
+        fclose(file);
+    }
+    else {
+        fprintf(stderr, "Unable to open file!\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void save_message(Mail_Body mail_body, int consfd,  char* mail_dir) {
