@@ -44,8 +44,6 @@ typedef struct {
     void (*func)(char*, int, char*);
 } option;
 
-
-
 option options[] = {
     {"SEND", handle_send_client},
     {"LIST", handle_list_message},
@@ -53,8 +51,6 @@ option options[] = {
     {"READ", handle_read_message},
     {"QUIT", handle_quit_message}
 };
-
-
 
 int main(const int argc, char *argv[]){
     char* port = argv[1];
@@ -144,7 +140,8 @@ void accept_client(int sfd, int* peersoc){
     printf("Accepted with filedescriptor of requesting socket %d \n", *peersoc);
 }
 
-void receive_message(int peersoc, char* buffer, int buflen, char* mail_dir){
+void receive_message(int peersoc, char* buffer, int buflen, char* mail_dir)
+{
     buffer[0] = '\0';
     while(communication(peersoc,buffer,buflen, mail_dir) == 0);
 }
@@ -241,11 +238,10 @@ char* get_receiver_path(char* mail_dir, char* current_user){
 }
 
 char* get_full_path(char* root, char* fileName){
-    char *path = malloc(strlen(root) + strlen(fileName) + 20); // +4 for slashes and null terminator
+    char *path = malloc(strlen(root) + strlen(fileName) + 4); // +4 for slashes and null terminator
     sprintf(path, "%s/%s", root, fileName);
     return path;
 }
-
 
 void handle_list_message(char* buffer, int consfd, char* mail_dir)
 {
@@ -275,12 +271,11 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir)
             snprintf(message, message_len, "%d: %s", i + 1, messages[i]);
             send_client(message, consfd);
             free(message);
+            free(messages[i]);
         }
     }
-
     free(receiver_path);
     free(messages);
-
 }
 
 char** list_message(char* receiver_path) {
@@ -297,7 +292,7 @@ char** list_message(char* receiver_path) {
             snprintf(full_path, path_len, "%s/%s", receiver_path, dir->d_name);
             struct stat file_stat;
             if (stat(full_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
-                char **temp = realloc(messages, (cnt + 1) * sizeof(char*));
+                char **temp = realloc(messages, (cnt + 2) * sizeof(char*));
                 messages = temp;
                 messages[cnt] = strdup(dir->d_name);
                 cnt++;
@@ -305,11 +300,11 @@ char** list_message(char* receiver_path) {
         }
         closedir(d);
     }
-    if(cnt != 0)
-        messages[cnt] = NULL;
+     if (messages) {
+        messages[cnt] = NULL; 
+    }
     return messages;
 }
-
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir){
     printf("Del messages \n");
@@ -328,12 +323,32 @@ void handle_read_message(char* buffer, int consfd, char* mail_dir){
 
     char *receiver_path = get_receiver_path(mail_dir, send_obj[0]);
     char **messages = list_message(receiver_path);
-
-    char* full_path = get_full_path(receiver_path, messages[atoi(send_obj[1] - 1)]);
-
+    // check if the folder exist
+    if(messages == NULL)
+    {
+        send_client("Invalid folder",consfd);
+        return;
+    }
+    int count = get_messages_count(messages);
+    // Für mina da hattest du die - 1 in atoi drinnen string - int ??
+    int message_index = atoi(send_obj[1]) - 1;
+    // check if there is no messages at the specific folder
+    if(message_index < 0 || message_index >= count)
+    {
+        // out of range
+        send_client("Invalid Message index",consfd);
+        return;
+    }
+    char* full_path = get_full_path(receiver_path, messages[message_index]);
     FILE* file = fopen(full_path, "r");
-    read_file(file, consfd);
+    if(file != NULL)
+    {
+        read_file(file, consfd);
+    }
+    // Free all messages in the messages (string array)
+    for(int i = 0; i < count; i++){free(messages[i]);}
     free(messages);
+    free(receiver_path);
     free(full_path);
 }
 
