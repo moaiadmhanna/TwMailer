@@ -38,6 +38,7 @@ int get_messages_count(char **messages);
 char *get_receiver_path(char *mail_dir, char *current_user);
 void tokenize_message(char *buffer, char **send_obj, int times);
 void read_file(FILE *file, int consfd);
+char *get_path_of_index(char **send_obj, int consfd, char *mail_dir);
 
 typedef struct {
     char* name;
@@ -270,7 +271,7 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir)
             char *message = malloc(message_len);
             snprintf(message, message_len, "%d: %s", i + 1, messages[i]);
             send_client(message, consfd);
-            free(message);
+            free(messages[i]);
             free(messages[i]);
         }
     }
@@ -293,6 +294,7 @@ char** list_message(char* receiver_path) {
             struct stat file_stat;
             if (stat(full_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
                 char **temp = realloc(messages, (cnt + 2) * sizeof(char*));
+                char **temp = realloc(messages, (cnt + 2) * sizeof(char*));
                 messages = temp;
                 messages[cnt] = strdup(dir->d_name);
                 cnt++;
@@ -300,15 +302,32 @@ char** list_message(char* receiver_path) {
         }
         closedir(d);
     }
-     if (messages) {
-        messages[cnt] = NULL; 
-    }
+    if(messages)
+        messages[cnt] = NULL;
     return messages;
 }
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir){
-    printf("Del messages \n");
+    if (recv(consfd, buffer, BUFFER_SIZE, 0) == -1 || recv(consfd, buffer + strlen(buffer), BUFFER_SIZE, 0) == -1) {
+        printf("cannot receive due to %d \n", errno);
+        exit(EXIT_FAILURE);
+    }
 
+    char *send_obj[2]  = {'\0'};
+    tokenize_message(buffer, send_obj, 2);
+
+    char* path_of_index = get_path_of_index(send_obj, consfd, mail_dir);
+    if(path_of_index == NULL || remove(path_of_index) != 0){
+        send_client("ERR", consfd);
+    }
+    else{
+        send_client("OK", consfd);
+        char *receiver_path = get_receiver_path(mail_dir, send_obj[0]);
+        char **messages = list_message(receiver_path);
+        if (!messages) remove(receiver_path);
+    }
+
+    free(path_of_index);
 }
 
 void handle_read_message(char* buffer, int consfd, char* mail_dir){
@@ -321,47 +340,47 @@ void handle_read_message(char* buffer, int consfd, char* mail_dir){
     char *send_obj[2]  = {'\0'};
     tokenize_message(buffer, send_obj, 2);
 
+    char* path_of_index = get_path_of_index(send_obj, consfd, mail_dir);
+    if(path_of_index == NULL){
+        send_client("ERR", consfd);
+        return;
+    }
+    FILE* file = fopen(path_of_index, "r");
+    read_file(file, consfd);
+    free(path_of_index);
+}
+
+char* get_path_of_index(char** send_obj, int consfd, char* mail_dir) {
     char *receiver_path = get_receiver_path(mail_dir, send_obj[0]);
     char **messages = list_message(receiver_path);
-    // check if the folder exist
-    if(messages == NULL)
-    {
-        send_client("Invalid folder",consfd);
-        return;
-    }
-    int count = get_messages_count(messages);
-    // Für mina da hattest du die - 1 in atoi drinnen string - int ??
     int message_index = atoi(send_obj[1]) - 1;
-    // check if there is no messages at the specific folder
-    if(message_index < 0 || message_index >= count)
-    {
-        // out of range
-        send_client("Invalid Message index",consfd);
-        return;
+    if (!messages || message_index < 0 || message_index >= get_messages_count(messages)) {
+        free(receiver_path);
+        if (messages) free(messages);
+        return NULL;
     }
+
     char* full_path = get_full_path(receiver_path, messages[message_index]);
-    FILE* file = fopen(full_path, "r");
-    if(file != NULL)
-    {
-        read_file(file, consfd);
-    }
-    // Free all messages in the messages (string array)
-    for(int i = 0; i < count; i++){free(messages[i]);}
+    
+    for (int i = 0; messages[i]; i++) free(messages[i]);
     free(messages);
     free(receiver_path);
-    free(full_path);
+    
+    return full_path;
 }
 
 void read_file(FILE* file, int consfd){
     char line[256];
     if (file != NULL) {
         while (fgets(line, sizeof(line), file)) {
-            send_client(line, consfd);
+            if(strlen(line) > 0){
+                send_client(line, consfd);
+            }else send_client("<Message is empty>", consfd);
         }
         fclose(file);
     }
     else {
-        fprintf(stderr, "Unable to open file!\n");
+        send_client("Unable to open file!", consfd);
         exit(EXIT_FAILURE);
     }
 }
