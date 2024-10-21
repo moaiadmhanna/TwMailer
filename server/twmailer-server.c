@@ -120,7 +120,6 @@ int check_buffer(int size){
 
 int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char* current_user)
 {
-    send_client("Option (SEND | DEL | READ | LIST | QUIT)", consfd);
     memset(buffer, 0, buffersize);
     check_buffer(recv(consfd, &buffer[0],buffersize,0));
     char option[BUFFER_SIZE];
@@ -128,7 +127,7 @@ int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char
     trim(option);
     for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
         if(strcasecmp(option, options[i].name) == 0){
-            send_client("OK from the comm", consfd);
+            send_client("OK", consfd);
             options[i].func(buffer, consfd, mail_dir, current_user);
             return 0;
         }
@@ -161,7 +160,7 @@ void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* ma
         send_client("Username should have max 8 char.", *peersoc);
         return;
     }
-    send_client("OK from accept client", *peersoc);
+    send_client("OK", *peersoc);
     printf("Accepted with filedescriptor of requesting socket %d \n", *peersoc);
     receive_message(*peersoc,buffer,BUFFER_SIZE, mail_dir); 
 }
@@ -171,6 +170,7 @@ void receive_message(int peersoc, char* buffer, int buflen, char* mail_dir){
     strcpy(current_user, buffer);
     trim(current_user);
     memset(buffer, 0, buflen);
+    send_client("Option (SEND | DEL | READ | LIST | QUIT)", peersoc);
     while(communication(peersoc,buffer,buflen, mail_dir, current_user) == 0);
 }
 
@@ -232,13 +232,10 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
         subject: send_obj[2],
         message: send_obj[3]
     };
-    printf("Mail sender: %s\n", mail_body.sender);
-    printf("Current sender: %s\n", current_user);
-    printf("Mail Receiver: %s\n",mail_body.receiver);
-    printf("Receiver length %ld\n",strlen(mail_body.receiver));
+
     if(strcasecmp(mail_body.sender, current_user) != 0 || strlen(mail_body.receiver) > MAX_USER_CHAR){
         
-        send_client("ERR from send", consfd);
+        send_client("ERR", consfd);
         return;
     }
     save_message(mail_body, consfd, mail_dir);
@@ -246,15 +243,15 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
 }
 
 void send_client(char* message, int consfd) {
-    int message_length = strlen(message);
-    char *new = malloc(message_length + 1 + 1);
+    // int message_length = strlen(message);
+    // char *new = malloc(message_length + 1 + 1);
 
-    strcpy(new, message);
-    new[message_length] = '\n';
-    new[message_length + 1] = '\0';
+    // strcpy(new, message);
+    // new[message_length] = '\n';
+    // new[message_length + 1] = '\0';
 
-    send(consfd, new, strlen(new), 0);
-    free(new);
+    send(consfd, message, strlen(message), 0);
+    // free(new);
 }
 
 void handle_quit_message(char* buffer, int consfd, char* mail_dir, char* current_user){
@@ -340,6 +337,7 @@ char** list_message(char* receiver_path, char* sender) {
         }
         closedir(d);
     }
+    printf("%d", cnt);
     if(messages)
         messages[cnt] = NULL;
     return messages;
@@ -347,13 +345,16 @@ char** list_message(char* receiver_path, char* sender) {
 
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_user){
-    if (recv(consfd, buffer, BUFFER_SIZE, 0) == -1 || recv(consfd, buffer + strlen(buffer), BUFFER_SIZE, 0) == -1) {
+    printf("Del will be executed\n");
+    if (check_buffer(recv(consfd, buffer, BUFFER_SIZE, 0)) == -1 || check_buffer(recv(consfd, buffer + strlen(buffer), BUFFER_SIZE, 0)) == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
 
     char *send_obj[2]  = {'\0'};
     tokenize_message(buffer, send_obj, 2);
+    printf("Sender: %s\n", send_obj[0]);
+    printf("Number: %s\n", send_obj[1]);
 
     char* mail_path = get_user_dir(mail_dir, current_user);
     char* path_of_index = get_path_of_index(send_obj, consfd, mail_path);
@@ -362,7 +363,10 @@ void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_
     }
     else{
         send_client("OK", consfd);
-        char **messages = list_message(mail_dir, "All");
+        char **messages = list_message(mail_dir, send_obj[0]);
+        if(messages){
+            printf("Nice\n");
+        }
         if (!messages) remove(mail_dir);
     }
 

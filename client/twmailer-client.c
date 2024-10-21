@@ -73,7 +73,14 @@ void recv_from_server(int sockfd, char *buffer, int buffer_size) {
         exit(EXIT_FAILURE);
     }
     // buffer[bytes_received] = '\0';
-    printf("Server: %s\n", buffer);
+    printf("<< %s\n", buffer);
+}
+
+void input_client(char* output, char* input, int bufflen){
+    printf("%s ", output);
+    if(fgets(input, bufflen, stdin) == NULL){
+        exit(EXIT_FAILURE);
+    }
 }
 
 void handle_server_communication(int sockfd) {
@@ -83,80 +90,62 @@ void handle_server_communication(int sockfd) {
     // Receive initial server prompt (asking for username)
     recv_from_server(sockfd, buffer, BUFFER_SIZE);
     // Send username to server
-    printf("Enter username: >>");
-    fgets(input, BUFFER_SIZE, stdin);
-    // input[strcspn(input, "\n")] = 0;  // Remove newline
+
+    input_client(">>", input, BUFFER_SIZE);
     send_to_server(sockfd, input);
+
     // for ok from the accept function
     recv_from_server(sockfd, buffer, BUFFER_SIZE);
 
     while (1) {
         // Receive option prompt
-        memset(input,0,BUFFER_SIZE);
         // for options
+        memset(input,0,BUFFER_SIZE);
         recv_from_server(sockfd, buffer, BUFFER_SIZE);
-        printf("option: >>");
-        fgets(input, BUFFER_SIZE, stdin);
+
+        input_client(">>", input, BUFFER_SIZE);
         input[strcspn(input, "\n")] = 0;  // Remove newline
         send_to_server(sockfd, input);
 
         if (strcasecmp(input, "SEND") == 0) {
             // Send a message
-            printf("Enter sender: >>");
-            fgets(input, BUFFER_SIZE, stdin);
-            // input[strcspn(input, "\n")] = 0;
+            input_client("Sender >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
-            printf("Enter receiver: >>");
-            fgets(input, BUFFER_SIZE, stdin);
-            // input[strcspn(input, "\n")] = 0;
+            input_client("Receiver >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
-            printf("Enter subject: >>");
-            fgets(input, BUFFER_SIZE, stdin);
-            // input[strcspn(input, "\n")] = 0;
+            input_client("Subject >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
-            printf("Enter message body: >>");
-            fgets(input, BUFFER_SIZE, stdin);
-            // input[strcspn(input, "\n")] = 0;
+            input_client("Message >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
-            printf(">> ");
-            fgets(input, BUFFER_SIZE, stdin);
-            // input[strcspn(input, "\n")] = 0;
+            input_client(">>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
         } else if (strcasecmp(input, "LIST") == 0) {
             // List messages
-            printf("Enter sender to list messages from (or 'All'): ");
-            fgets(input, BUFFER_SIZE, stdin);
-            input[strcspn(input, "\n")] = 0;
+            input_client("Sender name (or 'All') >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
+            recv_from_server(sockfd, buffer, BUFFER_SIZE);
 
         } else if (strcasecmp(input, "DEL") == 0) {
-            // Delete a message
-            printf("Enter sender: ");
-            fgets(input, BUFFER_SIZE, stdin);
-            input[strcspn(input, "\n")] = 0;
+            input_client("Sender >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
-            printf("Enter message index to delete: ");
-            fgets(input, BUFFER_SIZE, stdin);
-            input[strcspn(input, "\n")] = 0;
+            input_client("Message number >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
         } else if (strcasecmp(input, "READ") == 0) {
             // Read a message
-            printf("Enter sender: ");
-            fgets(input, BUFFER_SIZE, stdin);
-            input[strcspn(input, "\n")] = 0;
+            input_client("Sender >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
-            printf("Enter message index to read: ");
-            fgets(input, BUFFER_SIZE, stdin);
-            input[strcspn(input, "\n")] = 0;
+            input_client("Message number >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
+            recv_from_server(sockfd, buffer, BUFFER_SIZE);
+
 
         } else if (strcasecmp(input, "QUIT") == 0) {
             // Quit the session
@@ -169,6 +158,6 @@ void handle_server_communication(int sockfd) {
         }
 
         // Receive response from server
-        recv_from_server(sockfd, buffer, BUFFER_SIZE);
+        // recv_from_server(sockfd, buffer, BUFFER_SIZE);
     }
 }
