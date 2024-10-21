@@ -8,7 +8,7 @@
 #include <sys/types.h> 
 #include <dirent.h>
 #include <errno.h>
-#define BUFFER_SIZE 50
+#define BUFFER_SIZE 1024
 #define MAX_USER_CHAR 9
 
 typedef struct{
@@ -120,18 +120,20 @@ int check_buffer(int size){
 
 int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char* current_user)
 {
-    send_client("\nOption (SEND | DEL | READ | LIST | QUIT)", consfd);
+    send_client("Option (SEND | DEL | READ | LIST | QUIT)", consfd);
     memset(buffer, 0, buffersize);
     check_buffer(recv(consfd, &buffer[0],buffersize,0));
-    
     char option[BUFFER_SIZE];
     strcpy(option,buffer);
     trim(option);
     for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
         if(strcasecmp(option, options[i].name) == 0){
+            send_client("OK from the comm", consfd);
             options[i].func(buffer, consfd, mail_dir, current_user);
+            return 0;
         }
     }
+    send_client(buffer, consfd);
     return 0;
 }
 
@@ -154,13 +156,12 @@ void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* ma
     }
     
     send_client("What is ur Username: ", *peersoc);
-    recv(*peersoc, &buffer[0], buffer_size, 0);
-    trim(buffer);
-
+    check_buffer(recv(*peersoc, &buffer[0], buffer_size, 0));
     if(strlen(buffer) > MAX_USER_CHAR){
         send_client("Username should have max 8 char.", *peersoc);
         return;
     }
+    send_client("OK from accept client", *peersoc);
     printf("Accepted with filedescriptor of requesting socket %d \n", *peersoc);
     receive_message(*peersoc,buffer,BUFFER_SIZE, mail_dir); 
 }
@@ -168,7 +169,8 @@ void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* ma
 void receive_message(int peersoc, char* buffer, int buflen, char* mail_dir){
     char *current_user = malloc(strlen(buffer) + 1 + 1);
     strcpy(current_user, buffer);
-    buffer[0] = '\0';
+    trim(current_user);
+    memset(buffer, 0, buflen);
     while(communication(peersoc,buffer,buflen, mail_dir, current_user) == 0);
 }
 
@@ -199,21 +201,25 @@ void tokenize_message(char* buffer, char** send_obj, int times) {
 void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_user)
 {
     // Receive Message
-    int total = 0; 
+    printf("Send will be executed\n");
+    int total = 0;
     int size = 0;
     while((size = check_buffer(recv(consfd, &buffer[total],BUFFER_SIZE,0))) > 0) {
+        printf("%s\n", buffer);
         total += size;
-        if (buffer[total - size] == '.' && size == 3) {
+        if (buffer[total - size] == '.' && size == 2) {
             break; 
         }
     };
+
 
     // Tokenize Message
     char *send_obj[5]  = {'\0'};
     tokenize_message(buffer, send_obj, 5);
    
-    for(int i = 0; send_obj[i] != NULL; i++)
+    for(int i = 0; i < 5; i++)
     {
+        printf("send obj after tokenizing %s\n", send_obj[i]);
         if(send_obj[i] == NULL)
         {
             send_client("Invalid Argument", consfd);
@@ -226,12 +232,17 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
         subject: send_obj[2],
         message: send_obj[3]
     };
+    printf("Mail sender: %s\n", mail_body.sender);
+    printf("Current sender: %s\n", current_user);
+    printf("Mail Receiver: %s\n",mail_body.receiver);
+    printf("Receiver length %ld\n",strlen(mail_body.receiver));
     if(strcasecmp(mail_body.sender, current_user) != 0 || strlen(mail_body.receiver) > MAX_USER_CHAR){
-        send_client("ERR", consfd);
+        
+        send_client("ERR from send", consfd);
         return;
     }
     save_message(mail_body, consfd, mail_dir);
-    send_client("OK", consfd);
+    send_client("OK from send", consfd);
 }
 
 void send_client(char* message, int consfd) {
@@ -297,6 +308,7 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
 
     // free(receiver_path);
     free(messages);
+
 }
 
 char** list_message(char* receiver_path, char* sender) {
@@ -320,7 +332,6 @@ char** list_message(char* receiver_path, char* sender) {
             snprintf(full_path, path_len, "%s/%s", receiver_path, dir->d_name);
             struct stat file_stat;
             if (stat(full_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
-                char **temp = realloc(messages, (cnt + 2) * sizeof(char*));
                 char **temp = realloc(messages, (cnt + 2) * sizeof(char*));
                 messages = temp;
                 messages[cnt] = strdup(dir->d_name);
@@ -411,6 +422,8 @@ void read_file(FILE* file, int consfd){
 }
 
 void save_message(Mail_Body mail_body, int consfd,  char* mail_dir) {
+    //TEST
+    printf("am in save message\n");
     FILE *fptr;
    
     int root_dir_len = strlen(mail_dir);
