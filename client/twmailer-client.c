@@ -9,11 +9,36 @@
 
 #define BUFFER_SIZE 1024
 
+enum SENDING_STATE {Break = 1, Success = 0, Continue = 2};
+
+
+
 void create_socket(int *sockfd);
 void connect_to_server(int sockfd, struct sockaddr_in *serveraddr);
 void send_to_server(int sockfd, const char *message);
 void recv_from_server(int sockfd, char *buffer, int buffer_size);
 void handle_server_communication(int sockfd);
+enum SENDING_STATE list_messages(int sockfd, char* input, char* buffer);
+enum SENDING_STATE read_message(int sockfd, char* input, char* buffer);
+enum SENDING_STATE send_message(int sockfd, char* input, char* buffer);
+enum SENDING_STATE delete_message(int sockfd, char* input, char* buffer);
+enum SENDING_STATE quit_client(int sockfd, char *input, char *buffer);
+
+typedef struct {
+    char* name;
+    enum SENDING_STATE (*func)(int, char*, char*);
+} option;
+
+option options[] = {
+    {"SEND", send_message},
+    {"LIST", list_messages},
+    {"DEL", delete_message},
+    {"READ", read_message},
+    {"QUIT", quit_client}
+};
+
+
+
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -90,6 +115,13 @@ void input_client(char* output, char* input, int bufflen){
     }
 }
 
+void prepare_and_send_messages(char** body, int sockfd, char* input){
+     for(int b = 0; body[b] != NULL; b++){
+        input_client(body[b], input, BUFFER_SIZE);
+        send_to_server(sockfd, input);
+    }
+}
+
 void handle_server_communication(int sockfd) {
     char buffer[BUFFER_SIZE];
     char input[BUFFER_SIZE];
@@ -105,11 +137,10 @@ void handle_server_communication(int sockfd) {
 
         // for ok from the accept function
         recv_from_server(sockfd, buffer, BUFFER_SIZE);
-        if(strcasecmp(buffer,"ok") == 0){break;}
+        if(strcasecmp(buffer,"OK") == 0) break;
     }
-
-
-    while (1) {
+    enum SENDING_STATE state = Success;
+    do {
         // Receive option prompt
         // for options
         memset(input,0,BUFFER_SIZE);
@@ -119,56 +150,59 @@ void handle_server_communication(int sockfd) {
         input[strcspn(input, "\n")] = 0;  // Remove newline
         send_to_server(sockfd, input);
 
-        if (strcasecmp(input, "SEND") == 0) {
-            // Send a message
-            input_client("Sender >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-
-            input_client("Receiver >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-
-            input_client("Subject >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-
-            input_client("Message >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-            while(1)
-            {
-                input_client(". to End >>", input, BUFFER_SIZE);
-                if(strcasecmp(input,".\n") == 0){break;}
+        for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
+            if(strcasecmp(input, options[i].name) == 0){
+                state = options[i].func(sockfd, input, buffer);
             }
-            send_to_server(sockfd, input);
-
-        } else if (strcasecmp(input, "LIST") == 0) {
-            // List messages
-            input_client("Sender name (or 'All') >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-            // for the number of messages
-            recv_from_server(sockfd, buffer, BUFFER_SIZE);
-            if(atoi(strtok(buffer, " ")) == 0){continue;}
-
-        } else if (strcasecmp(input, "DEL") == 0) {
-            input_client("Sender >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-
-            input_client("Message number >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-
-        } else if (strcasecmp(input, "READ") == 0) {
-            // Read a message
-            input_client("Sender >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-            input_client("Message number >>", input, BUFFER_SIZE);
-            send_to_server(sockfd, input);
-
-
-        } else if (strcasecmp(input, "QUIT") == 0) {
-            // Quit the session
-            send_to_server(sockfd, "QUIT");
-            break;
-
         }
+        if(state == Continue) {
+            state = Success;
+            continue;
+        }
+
         // Receive response from server
         recv_from_server(sockfd, buffer, BUFFER_SIZE);
+    } while (state == Success);
+}
+
+enum SENDING_STATE list_messages(int sockfd, char* input, char* buffer){
+    // List messages
+    char *body[] = {"Sender name (or 'All') >>", NULL};
+    prepare_and_send_messages(body, sockfd, input);
+
+    // for the number of messages
+    recv_from_server(sockfd, buffer, BUFFER_SIZE);
+    if(atoi(strtok(buffer, " ")) == 0)
+        return Continue;
+    return Success;
+}
+
+enum SENDING_STATE read_message(int sockfd, char* input, char* buffer){
+    char *body[] = {"Sender >>", "Message number >>", NULL};
+    prepare_and_send_messages(body, sockfd, input);
+    return Success;
+}
+
+enum SENDING_STATE delete_message(int sockfd, char* input, char* buffer){
+    char *body[] = {"Sender >>", "Message number >>", NULL};
+    prepare_and_send_messages(body, sockfd, input);
+    return Success;
+}
+
+enum SENDING_STATE send_message(int sockfd, char* input, char* buffer){
+    // Send a message
+    char *body[] = {"Sender >>", "Receiver >>", "Subject >>", "Message >>", NULL};
+    prepare_and_send_messages(body, sockfd, input);
+    while(1)
+    {
+        input_client(". to End >>", input, BUFFER_SIZE);
+        if(strcasecmp(input,".\n") == 0)break;
     }
+    send_to_server(sockfd, input);
+    return Success;
+}
+
+enum SENDING_STATE quit_client(int sockfd, char* input, char* buffer){
+    send_to_server(sockfd, "QUIT");
+    exit(0);
 }

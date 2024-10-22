@@ -36,11 +36,11 @@ void send_client(char *message, int consfd);
 void save_message(Mail_Body mail_body, int consfd, char* mail_dir);
 char** list_message(char* receiver_path, char* sender);
 int get_messages_count(char **messages);
-void tokenize_message(char *buffer, char **send_obj, int times);
+int tokenize_message(char *buffer, char **send_obj, int times);
 void read_file(FILE *file, int consfd);
 char *get_path_of_index(char **send_obj, int consfd, char *mail_dir);
 char *get_user_dir(char *mail_dir, char *username);
-int check_buffer(int size);
+int check_buffer(int size, int consfd);
 
 typedef struct {
     char* name;
@@ -109,9 +109,8 @@ void listening(int sfd){
     }
 }
 
-int check_buffer(int size){
+int check_buffer(int size, int consfd){
     if(size == -1) {
-        printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
     return size;
@@ -130,7 +129,7 @@ void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* ma
     }
     
     send_client("What is ur Username: ", *peersoc);
-    check_buffer(recv(*peersoc, &buffer[0], buffer_size, 0));
+    check_buffer(recv(*peersoc, &buffer[0], buffer_size, 0), *peersoc);
     if(strlen(buffer) > MAX_USER_CHAR){
         send_client("Username should have max 8 char.", *peersoc);
         return;
@@ -152,7 +151,7 @@ int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char
 {
     memset(buffer, 0, buffersize);
     send_client("Option (SEND | DEL | READ | LIST | QUIT)", consfd);
-    check_buffer(recv(consfd, &buffer[0],buffersize,0));
+    check_buffer(recv(consfd, &buffer[0], buffersize, 0), consfd);
     char option[BUFFER_SIZE];
     strcpy(option,buffer);
     trim(option);
@@ -184,16 +183,21 @@ void trim(char *input)
     }
 }
 
-void tokenize_message(char* buffer, char** send_obj, int times) {
+int tokenize_message(char* buffer, char** send_obj, int times) {
+    if(buffer[0]== '\n'){
+        return 1;
+    }
     char *tokens = strtok(buffer, "\n");
     trim(tokens);
-    if (tokens == NULL)
-        exit(EXIT_FAILURE);
+    if (tokens == NULL){
+        return 1;
+    }
     for (int i = 0; i < times && tokens != NULL; i++) {
         trim(tokens);
         send_obj[i] = tokens;
         tokens = strtok(NULL, "\n");
     }
+    return 0;
 }
 
 void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_user)
@@ -201,7 +205,7 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
     // Receive Message
     int total = 0;
     int size = 0;
-    while((size = check_buffer(recv(consfd, &buffer[total],BUFFER_SIZE,0))) > 0) {
+    while((size = check_buffer(recv(consfd, &buffer[total],BUFFER_SIZE,0), consfd)) > 0) {
         total += size;
         if (buffer[total - size] == '.' && size == 2) {
             break; 
@@ -211,7 +215,10 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
 
     // Tokenize Message
     char *send_obj[5]  = {'\0'};
-    tokenize_message(buffer, send_obj, 5);
+    if(tokenize_message(buffer, send_obj, 5) == 1){
+        send_client("ERR", consfd);
+        return;
+    }
    
     for(int i = 0; i < 5; i++)
     {
@@ -273,7 +280,7 @@ char* get_full_path(char* root, char* fileName){
 
 void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current_user)
 {
-    check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0));
+    check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0), consfd);
 
     char* mail_path = get_user_dir(mail_dir, current_user);
     char **messages = list_message(mail_path, buffer);
@@ -354,16 +361,16 @@ char** list_message(char* receiver_path, char* sender) {
 
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_user){
-    if (check_buffer(recv(consfd, buffer, BUFFER_SIZE, 0)) == -1 || check_buffer(recv(consfd, buffer + strlen(buffer), BUFFER_SIZE, 0)) == -1) {
+    if (check_buffer(recv(consfd, buffer, BUFFER_SIZE, 0), consfd) == -1 || check_buffer(recv(consfd, buffer + strlen(buffer), BUFFER_SIZE, 0), consfd) == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
 
     char *send_obj[2]  = {'\0'};
-    tokenize_message(buffer, send_obj, 2);
-    printf("Sender: %s\n", send_obj[0]);
-    printf("Number: %s\n", send_obj[1]);
-
+    if(tokenize_message(buffer, send_obj, 2) == 1){
+        send_client("ERR", consfd);
+        return;
+    }
     char* mail_path = get_user_dir(mail_dir, current_user);
     char* path_of_index = get_path_of_index(send_obj, consfd, mail_path);
     if(path_of_index == NULL || remove(path_of_index) != 0){
@@ -382,11 +389,14 @@ void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_
 }
 
 void handle_read_message(char* buffer, int consfd, char* mail_dir, char* current_user){
-    int size = check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0));
-    check_buffer(recv(consfd, &buffer[size],BUFFER_SIZE,0));
-
+    memset(buffer, 0, BUFFER_SIZE);
+    int size = check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0), consfd);
+    check_buffer(recv(consfd, &buffer[size],BUFFER_SIZE,0), consfd);
     char *send_obj[2]  = {'\0'};
-    tokenize_message(buffer, send_obj, 2);
+    if(tokenize_message(buffer, send_obj, 2) == 1){
+        send_client("ERR", consfd);
+        return;
+    }
 
     char* mail_path = get_user_dir(mail_dir, current_user);
     char* path_of_index = get_path_of_index(send_obj, consfd, mail_path);
@@ -420,7 +430,7 @@ char* get_path_of_index(char** send_obj, int consfd, char* mail_dir) {
 void read_file(FILE* file, int consfd){
     char line[256];
     if (file != NULL) {
-        while (fgets(line, sizeof(line), file)) {
+        while (fgets(line, sizeof(line), file) != NULL) { 
             if(strlen(line) > 0){
                 send_client(line, consfd);
             }
