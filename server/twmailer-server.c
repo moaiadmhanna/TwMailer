@@ -243,11 +243,10 @@ void send_client(char* message, int consfd) {
     strcpy(new, message);
     new[message_length + 1] = '\n';
     new[message_length + 2] = '\0';
-    printf("new message : %s\n",new);
      // Send the length of the message
     int new_length = strlen(new);
-    send(consfd, &new_length, sizeof(new_length), 0); 
-    send(consfd, new, strlen(message), 0);
+    send(consfd, &new_length, sizeof(new_length), 0); // to determine the length of the message 
+    send(consfd, new, strlen(message), 0); // the message it self
     free(new);
 }
 
@@ -274,7 +273,6 @@ char* get_full_path(char* root, char* fileName){
 
 void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current_user)
 {
-    //./Database/Muayad
     check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0));
 
     char* mail_path = get_user_dir(mail_dir, current_user);
@@ -288,18 +286,32 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
     sprintf(number_of_messages, "%d Messages", count);
     send_client(number_of_messages, consfd);
     free(number_of_messages);
-     if (messages != NULL) {
-        for (int i = 0; messages[i] != NULL; i++) {
-            int message_len = snprintf(NULL, 0, "%d: %s", i + 1, messages[i]) + 1;
-            char *message = malloc(message_len);
-            snprintf(message, message_len, "%d: %s", i + 1, messages[i]);
-            send_client(message, consfd);
-            free(message);
-            free(messages[i]);
+     if (messages != NULL) 
+        {
+            int total_len = 0;
+            for (int i = 0; messages[i] != NULL; i++) {
+                total_len += snprintf(NULL, 0, "%d: %s\n", i + 1, messages[i]);  // Add +1 for the null terminator
+            }
+            // Allocate memory for the long_message
+            char *long_message = malloc(total_len + 2);
+            if (long_message == NULL) {
+                perror("Failed to allocate memory for long_message");
+                exit(EXIT_FAILURE);
+            }
+            // Concatenate each message into long_message
+            long_message[0] = '\0';   // Start with an empty string
+            strcpy(long_message, "\n");
+            for (int i = 0; messages[i] != NULL; i++) {
+                char *message = malloc(snprintf(NULL, 0, "%d: %s\n", i + 1, messages[i]) + 1);
+                snprintf(message, snprintf(NULL, 0, "%d: %s\n", i + 1, messages[i]) + 1, "%d: %s\n", i + 1, messages[i]);
+                strcat(long_message, message);
+                free(message);  // Free the individual message after concatenating
+                free(messages[i]);  // Free the original message
+            }
+            // Send the entire long_message to the client
+            send_client(long_message, consfd);
+            free(long_message);
         }
-
-    }
-
     // free(receiver_path);
     free(messages);
 
@@ -342,7 +354,6 @@ char** list_message(char* receiver_path, char* sender) {
 
 
 void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_user){
-    printf("Del will be executed\n");
     if (check_buffer(recv(consfd, buffer, BUFFER_SIZE, 0)) == -1 || check_buffer(recv(consfd, buffer + strlen(buffer), BUFFER_SIZE, 0)) == -1) {
         printf("cannot receive due to %d \n", errno);
         exit(EXIT_FAILURE);

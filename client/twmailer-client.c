@@ -55,13 +55,9 @@ void create_socket(int *sockfd) {
 }
 
 void connect_to_server(int sockfd, struct sockaddr_in *serveraddr) {
-    int enable = 0;
+
     if (connect(sockfd, (struct sockaddr *)serveraddr, sizeof(*serveraddr)) == -1) {
         perror("Failed to connect to the server");
-        exit(EXIT_FAILURE);
-    }
-     if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY,&enable, sizeof(int)) == -1) {
-        printf("Unable to set TCP_NODELAY due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
 }
@@ -144,15 +140,8 @@ void handle_server_communication(int sockfd) {
             // List messages
             input_client("Sender name (or 'All') >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
+            // for the number of messages
             recv_from_server(sockfd, buffer, BUFFER_SIZE);
-            char *number_of_messages = strtok(buffer," ");
-            printf("Number of messages %s \n",number_of_messages);
-            for(int x = 0; x < atoi(number_of_messages); x++)
-            {
-                recv_from_server(sockfd, buffer, BUFFER_SIZE);
-                printf("%d: %s",x,buffer);
-            }
-            continue;
 
         } else if (strcasecmp(input, "DEL") == 0) {
             input_client("Sender >>", input, BUFFER_SIZE);
