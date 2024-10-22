@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>  
@@ -94,7 +95,6 @@ void setup_socket(int sfd, struct sockaddr_in* serveraddr){
         printf("Unable to set socket options due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
-
     if (bind(sfd, (struct sockaddr *)serveraddr, sizeof(*serveraddr)) == -1) {
         printf("Binding failed with error %d ", errno);
         exit(EXIT_FAILURE);
@@ -115,31 +115,6 @@ int check_buffer(int size){
         exit(EXIT_FAILURE);
     }
     return size;
-}
-
-
-int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char* current_user)
-{
-    memset(buffer, 0, buffersize);
-    check_buffer(recv(consfd, &buffer[0],buffersize,0));
-    char option[BUFFER_SIZE];
-    strcpy(option,buffer);
-    trim(option);
-    for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
-        if(strcasecmp(option, options[i].name) == 0){
-            send_client("OK", consfd);
-            options[i].func(buffer, consfd, mail_dir, current_user);
-            return 0;
-        }
-    }
-    send_client(buffer, consfd);
-    return 0;
-}
-
-char* get_user_dir(char* mail_dir, char* username){
-    char *mail_path = malloc(strlen(mail_dir) + strlen(username) + 2);
-    sprintf(mail_path, "%s/%s", mail_dir, username);
-    return mail_path;
 }
 
 void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* mail_dir, int* connected){
@@ -169,9 +144,32 @@ void receive_message(int peersoc, char* buffer, int buflen, char* mail_dir){
     char *current_user = malloc(strlen(buffer) + 1 + 1);
     strcpy(current_user, buffer);
     trim(current_user);
-    memset(buffer, 0, buflen);
-    send_client("Option (SEND | DEL | READ | LIST | QUIT)", peersoc);
+    // send_client("Option (SEND | DEL | READ | LIST | QUIT)", peersoc);
     while(communication(peersoc,buffer,buflen, mail_dir, current_user) == 0);
+}
+
+int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char* current_user)
+{
+    memset(buffer, 0, buffersize);
+    send_client("Option (SEND | DEL | READ | LIST | QUIT)", consfd);
+    check_buffer(recv(consfd, &buffer[0],buffersize,0));
+    char option[BUFFER_SIZE];
+    strcpy(option,buffer);
+    trim(option);
+    for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
+        if(strcasecmp(option, options[i].name) == 0){
+            options[i].func(buffer, consfd, mail_dir, current_user);
+            return 0;
+        }
+    }
+    send_client("Invalid option", consfd);
+    return 0;
+}
+
+char* get_user_dir(char* mail_dir, char* username){
+    char *mail_path = malloc(strlen(mail_dir) + strlen(username) + 2);
+    sprintf(mail_path, "%s/%s", mail_dir, username);
+    return mail_path;
 }
 
 void trim(char *input)
@@ -201,11 +199,9 @@ void tokenize_message(char* buffer, char** send_obj, int times) {
 void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_user)
 {
     // Receive Message
-    printf("Send will be executed\n");
     int total = 0;
     int size = 0;
     while((size = check_buffer(recv(consfd, &buffer[total],BUFFER_SIZE,0))) > 0) {
-        printf("%s\n", buffer);
         total += size;
         if (buffer[total - size] == '.' && size == 2) {
             break; 
@@ -219,7 +215,6 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
    
     for(int i = 0; i < 5; i++)
     {
-        printf("send obj after tokenizing %s\n", send_obj[i]);
         if(send_obj[i] == NULL)
         {
             send_client("Invalid Argument", consfd);
@@ -239,19 +234,18 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
         return;
     }
     save_message(mail_body, consfd, mail_dir);
-    send_client("OK from send", consfd);
+    send_client("OK", consfd);
 }
 
 void send_client(char* message, int consfd) {
-    // int message_length = strlen(message);
-    // char *new = malloc(message_length + 1 + 1);
-
-    // strcpy(new, message);
-    // new[message_length] = '\n';
-    // new[message_length + 1] = '\0';
-
-    send(consfd, message, strlen(message), 0);
-    // free(new);
+    int message_length = strlen(message);
+    char *new = malloc(message_length + 2);
+    strcpy(new, message);
+    new[message_length + 1] = '\n';
+    new[message_length + 2] = '\0';
+    printf("new message : %s\n",new);
+    send(consfd, new, strlen(message), 0);
+    free(new);
 }
 
 void handle_quit_message(char* buffer, int consfd, char* mail_dir, char* current_user){
@@ -291,7 +285,6 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
     sprintf(number_of_messages, "%d Messages", count);
     send_client(number_of_messages, consfd);
     free(number_of_messages);
-
      if (messages != NULL) {
         for (int i = 0; messages[i] != NULL; i++) {
             int message_len = snprintf(NULL, 0, "%d: %s", i + 1, messages[i]) + 1;
@@ -301,6 +294,7 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
             free(message);
             free(messages[i]);
         }
+
     }
 
     // free(receiver_path);

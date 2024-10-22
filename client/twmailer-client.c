@@ -3,6 +3,9 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <netinet/tcp.h>
+#include <errno.h>
+
 
 #define BUFFER_SIZE 1024
 
@@ -52,8 +55,13 @@ void create_socket(int *sockfd) {
 }
 
 void connect_to_server(int sockfd, struct sockaddr_in *serveraddr) {
+    int enable = 0;
     if (connect(sockfd, (struct sockaddr *)serveraddr, sizeof(*serveraddr)) == -1) {
         perror("Failed to connect to the server");
+        exit(EXIT_FAILURE);
+    }
+     if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY,&enable, sizeof(int)) == -1) {
+        printf("Unable to set TCP_NODELAY due to %d \n", errno);
         exit(EXIT_FAILURE);
     }
 }
@@ -72,7 +80,8 @@ void recv_from_server(int sockfd, char *buffer, int buffer_size) {
         perror("Failed to receive message from server");
         exit(EXIT_FAILURE);
     }
-    // buffer[bytes_received] = '\0';
+    printf("bytes Recived : %d\n",bytes_received);
+    // buffer[bytes_received + 1] = '\0';
     printf("<< %s\n", buffer);
 }
 
@@ -88,14 +97,19 @@ void handle_server_communication(int sockfd) {
     char input[BUFFER_SIZE];
     memset(input,0,BUFFER_SIZE);
     // Receive initial server prompt (asking for username)
-    recv_from_server(sockfd, buffer, BUFFER_SIZE);
-    // Send username to server
+    while(1)
+    {
+        recv_from_server(sockfd, buffer, BUFFER_SIZE);
+        // Send username to server
 
-    input_client(">>", input, BUFFER_SIZE);
-    send_to_server(sockfd, input);
+        input_client(">>", input, BUFFER_SIZE);
+        send_to_server(sockfd, input);
 
-    // for ok from the accept function
-    recv_from_server(sockfd, buffer, BUFFER_SIZE);
+        // for ok from the accept function
+        recv_from_server(sockfd, buffer, BUFFER_SIZE);
+        if(strcasecmp(buffer,"ok") == 0){break;}
+    }
+
 
     while (1) {
         // Receive option prompt
@@ -129,6 +143,13 @@ void handle_server_communication(int sockfd) {
             input_client("Sender name (or 'All') >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
             recv_from_server(sockfd, buffer, BUFFER_SIZE);
+            char *number_of_messages = strtok(buffer," ");
+            printf("Number of messages %s \n",number_of_messages);
+            for(int x = 0; x < atoi(number_of_messages); x++)
+            {
+                recv_from_server(sockfd, buffer, BUFFER_SIZE);
+            }
+            continue;
 
         } else if (strcasecmp(input, "DEL") == 0) {
             input_client("Sender >>", input, BUFFER_SIZE);
@@ -141,16 +162,16 @@ void handle_server_communication(int sockfd) {
             // Read a message
             input_client("Sender >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
+            // to save the number of messages : 
+            recv_from_server(sockfd, buffer, BUFFER_SIZE);
 
             input_client("Message number >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
-            recv_from_server(sockfd, buffer, BUFFER_SIZE);
 
 
         } else if (strcasecmp(input, "QUIT") == 0) {
             // Quit the session
             send_to_server(sockfd, "QUIT");
-            recv_from_server(sockfd, buffer, BUFFER_SIZE);
             break;
 
         } else {
@@ -158,6 +179,6 @@ void handle_server_communication(int sockfd) {
         }
 
         // Receive response from server
-        // recv_from_server(sockfd, buffer, BUFFER_SIZE);
+        recv_from_server(sockfd, buffer, BUFFER_SIZE);
     }
 }
