@@ -423,7 +423,8 @@ void read_file(FILE* file, int consfd){
         while (fgets(line, sizeof(line), file)) {
             if(strlen(line) > 0){
                 send_client(line, consfd);
-            }else send_client("<Message is empty>", consfd);
+            }
+            else send_client("<Message is empty>", consfd);
         }
         fclose(file);
     }

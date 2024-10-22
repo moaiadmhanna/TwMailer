@@ -132,8 +132,11 @@ void handle_server_communication(int sockfd) {
 
             input_client("Message >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
-
-            input_client(">>", input, BUFFER_SIZE);
+            while(1)
+            {
+                input_client(". to End >>", input, BUFFER_SIZE);
+                if(strcasecmp(input,".\n") == 0){break;}
+            }
             send_to_server(sockfd, input);
 
         } else if (strcasecmp(input, "LIST") == 0) {
@@ -142,6 +145,7 @@ void handle_server_communication(int sockfd) {
             send_to_server(sockfd, input);
             // for the number of messages
             recv_from_server(sockfd, buffer, BUFFER_SIZE);
+            if(atoi(strtok(buffer, " ")) == 0){continue;}
 
         } else if (strcasecmp(input, "DEL") == 0) {
             input_client("Sender >>", input, BUFFER_SIZE);
@@ -164,7 +168,6 @@ void handle_server_communication(int sockfd) {
             break;
 
         }
-
         // Receive response from server
         recv_from_server(sockfd, buffer, BUFFER_SIZE);
     }
