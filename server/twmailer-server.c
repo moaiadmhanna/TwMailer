@@ -244,6 +244,9 @@ void send_client(char* message, int consfd) {
     new[message_length + 1] = '\n';
     new[message_length + 2] = '\0';
     printf("new message : %s\n",new);
+     // Send the length of the message
+    int new_length = strlen(new);
+    send(consfd, &new_length, sizeof(new_length), 0); 
     send(consfd, new, strlen(message), 0);
     free(new);
 }

@@ -75,12 +75,14 @@ void send_to_server(int sockfd, const char *message) {
 
 void recv_from_server(int sockfd, char *buffer, int buffer_size) {
     memset(buffer, 0, buffer_size);
-    int bytes_received = recv(sockfd, buffer, buffer_size - 1, 0);
+    int message_length;
+    recv(sockfd, &message_length, sizeof(message_length), 0);
+    int bytes_received = recv(sockfd, buffer, message_length, 0);
     if (bytes_received == -1) {
         perror("Failed to receive message from server");
         exit(EXIT_FAILURE);
     }
-    printf("bytes Recived : %d\n",bytes_received);
+    // printf("bytes Recived : %d\n",bytes_received);
     // buffer[bytes_received + 1] = '\0';
     printf("<< %s\n", buffer);
 }
@@ -148,6 +150,7 @@ void handle_server_communication(int sockfd) {
             for(int x = 0; x < atoi(number_of_messages); x++)
             {
                 recv_from_server(sockfd, buffer, BUFFER_SIZE);
+                printf("%d: %s",x,buffer);
             }
             continue;
 
@@ -162,9 +165,6 @@ void handle_server_communication(int sockfd) {
             // Read a message
             input_client("Sender >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
-            // to save the number of messages : 
-            recv_from_server(sockfd, buffer, BUFFER_SIZE);
-
             input_client("Message number >>", input, BUFFER_SIZE);
             send_to_server(sockfd, input);
 
@@ -174,8 +174,6 @@ void handle_server_communication(int sockfd) {
             send_to_server(sockfd, "QUIT");
             break;
 
-        } else {
-            printf("Invalid option. Try again.\n");
         }
 
         // Receive response from server
