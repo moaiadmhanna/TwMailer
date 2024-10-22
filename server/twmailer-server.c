@@ -212,7 +212,6 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
         }
     };
 
-
     // Tokenize Message
     char *send_obj[5]  = {'\0'};
     if(tokenize_message(buffer, send_obj, 5) == 1){
@@ -389,6 +388,7 @@ void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_
 }
 
 void handle_read_message(char* buffer, int consfd, char* mail_dir, char* current_user){
+
     memset(buffer, 0, BUFFER_SIZE);
     int size = check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0), consfd);
     check_buffer(recv(consfd, &buffer[size],BUFFER_SIZE,0), consfd);
@@ -405,6 +405,7 @@ void handle_read_message(char* buffer, int consfd, char* mail_dir, char* current
         return;
     }
     FILE* file = fopen(path_of_index, "r");
+
     read_file(file, consfd);
     free(path_of_index);
 }
@@ -428,14 +429,17 @@ char* get_path_of_index(char** send_obj, int consfd, char* mail_dir) {
 }
 
 void read_file(FILE* file, int consfd){
+
     char line[256];
     if (file != NULL) {
-        while (fgets(line, sizeof(line), file) != NULL) { 
-            if(strlen(line) > 0){
-                send_client(line, consfd);
+        char buffer[BUFFER_SIZE] = "";  // Puffer, der alle Zeilen speichert
+        while (fgets(line, sizeof(line), file) != NULL) {
+            if (strlen(line) > 0) {
+                strncat(buffer, line, sizeof(buffer) - strlen(buffer) - 1);  // Platz im Puffer prüfen
             }
-            else send_client("<Message is empty>", consfd);
         }
+        
+        send_client(strlen(buffer) <= 0 ? "<Message is empty>":buffer, consfd);
         fclose(file);
     }
     else {

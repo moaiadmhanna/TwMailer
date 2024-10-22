@@ -195,9 +195,11 @@ enum SENDING_STATE send_message(int sockfd, char* input, char* buffer){
     prepare_and_send_messages(body, sockfd, input);
     while(1)
     {
-        input_client(". to End >>", input, BUFFER_SIZE);
+        input_client(">>", input, BUFFER_SIZE);
         if(strcasecmp(input,".\n") == 0)break;
+        send_to_server(sockfd, input);
     }
+    printf("Input: %s", input);
     send_to_server(sockfd, input);
     return Success;
 }
