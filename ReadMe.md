@@ -2,7 +2,10 @@
 # TwMailer
 
 ## Overview
-TwMailer is a command-line tool designed for efficient email communication. It allows users to send messages, manage their inbox, and perform various operations through a simple interface. The application utilizes a client-server architecture for sending and receiving messages.
+TwMailer is a command-line tool designed for efficient email communication, following a client-server architecture. The server listens on a specified port for incoming requests and handles one client request at a time using an iterative model, meaning it processes requests sequentially without concurrent request handling. Clients send commands to the server to send, receive, read or delete emails. Incoming and outgoing messages, along with metadata, are stored in a "mail-spool-directory" for later retrieval.
+
+## Technologies
+The TwMailer project is implemented using C, with socket programming providing the foundation for client-server communication. The server listens on a specified TCP port, handling connections from clients one at a time. File system operations are used to store emails and metadata in the mail-spool-directory, which serves as persistent storage. The project relies on standard C libraries for file management, network communication, and string manipulation, ensuring a lightweight and efficient execution. The iterative design of the server avoids the complexity of multi-threading, focusing on simplicity and stability in handling sequential requests.
 
 ## Features
 - **Send Messages**: Send messages to other users and save them in the recipient's directory.
