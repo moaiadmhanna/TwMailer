@@ -12,7 +12,6 @@ The TwMailer project is implemented using C, with socket programming providing t
 - **List Messages**: View all messages in your own inbox (directory).
 - **Read Messages**: Read specific messages from specific users in your own directory.
 - **Delete Messages**: Delete specific messages from specific users in your own directory.
-- **Client-Server Architecture**: Communicate through a server setup, allowing for multiple clients to send and receive messages.
 
 ## User Input
 Here are the possible user inputs for the TwMailer system:
