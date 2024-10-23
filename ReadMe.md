@@ -14,7 +14,7 @@ TwMailer is a command-line tool designed for efficient email communication. It a
 ## User Input
 Here are the possible user inputs for the TwMailer system:
 
-1. **send**: Send a message to a specified recipient and save it in their directory.
+```SEND```: Send a message to a specified recipient and save it in their directory.
    - **Format**:
      ```
      sender: <your_username>
@@ -23,27 +23,24 @@ Here are the possible user inputs for the TwMailer system:
      message: <your_message_content>
      ```
      
-2. **list**: List all messages in your own inbox (directory).
-   - **Format**: `list user` (to list your own messages) or `list all` (to list messages from all users)
+```LIST```: List all messages in your own inbox (directory).
+   - **Format**: `<username>` (to list your own messages) or `All` (to list messages from all users)
 
-3. **read**: Read a specific message from a specific user in your own directory.
+```READ```: Read a specific message from a specific user in your own directory.
    - **Format**:
      ```
-     read:
      user: <sender_username>
      index: <message_index>
      ```
 
-4. **del**: Delete a specific message from a specific user in your own directory.
+```DEL```: Delete a specific message from a specific user in your own directory.
    - **Format**:
      ```
-     del:
      user: <sender_username>
      index: <message_index>
      ```
 
-5. **quit**: Exit the program.
-   - **Format**: `quit`
+```QUIT```: Exit the program.
 
 ## Installation
 To set up TwMailer, follow these steps:
