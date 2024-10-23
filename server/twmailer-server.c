@@ -9,17 +9,16 @@
 #include <sys/types.h> 
 #include <dirent.h>
 #include <errno.h>
-#define BUFFER_SIZE 1024
-#define MAX_USER_CHAR 9
-
+#define BUFFER_SIZE 1024 // Buffer size for communication
+#define MAX_USER_CHAR 9 // Max username length (8 chars + null terminator)
+// Structure to represent an email
 typedef struct{
     char *sender;
     char *receiver;
     char *subject;
     char *message;
 } Mail_Body;
-
-
+// Function declarations
 void create_socket(int *sfd);
 void setup_socket(int sfd, struct sockaddr_in *serveraddr);
 void trim(char *input);
@@ -41,12 +40,12 @@ void read_file(FILE *file, int consfd);
 char *get_path_of_index(char **send_obj, int consfd, char *mail_dir);
 char *get_user_dir(char *mail_dir, char *username);
 int check_buffer(int size, int consfd);
-
+// Command options for the user (SEND, LIST, etc.)
 typedef struct {
     char* name;
     void (*func)(char*, int, char*, char*);
 } option;
-
+// List of available user options
 option options[] = {
     {"SEND", handle_send_client},
     {"LIST", handle_list_message},
@@ -54,10 +53,11 @@ option options[] = {
     {"READ", handle_read_message},
     {"QUIT", handle_quit_message}
 };
-
 int main(const int argc, char *argv[]){
     char* port = argv[1];
     char* mail_dir = argv[2];
+
+    // Create mail directory if not exists
     DIR* dir = opendir(mail_dir);
     if(!dir)
         mkdir(mail_dir, 0777);
@@ -78,12 +78,14 @@ int main(const int argc, char *argv[]){
     int peersoc; // Socket of client
     char buffer[BUFFER_SIZE];
     int connected =0;
+
+    // Main loop to accept and serve clients
     while(1)
         accept_client(sfd, &peersoc, buffer,BUFFER_SIZE, mail_dir, &connected); 
     close(sfd);
     return 0;
 }
-
+// Create a socket (TCP stream)
 void create_socket(int *sfd){
     *sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (*sfd == -1) {
@@ -91,7 +93,7 @@ void create_socket(int *sfd){
         exit(EXIT_FAILURE);
     }
 }
-
+// Set socket options and bind to the port
 void setup_socket(int sfd, struct sockaddr_in* serveraddr){
     int enable = 1;
     if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1) {
@@ -103,7 +105,7 @@ void setup_socket(int sfd, struct sockaddr_in* serveraddr){
         exit(EXIT_FAILURE);
     }
 }
-
+// Start listening for incoming connections
 void listening(int sfd){
     int constat = listen(sfd, 6);
     if (constat == -1) {
@@ -111,18 +113,20 @@ void listening(int sfd){
         exit(EXIT_FAILURE);
     }
 }
-
+// Check if the Buffer return -1 
 int check_buffer(int size, int consfd){
     if(size == -1) {
         exit(EXIT_FAILURE);
     }
     return size;
 }
-
+// Accept a client connection and ask for a username
 void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* mail_dir, int* connected){
     memset(buffer, 0, buffer_size);
     struct sockaddr client;
     socklen_t addrlen = sizeof(client);
+
+    // Accept client if no one is connected
     if(!*connected){
         if ((*peersoc = accept(sfd, &client, &addrlen)) == -1) {
             printf("Unable to accept client connection");
@@ -133,6 +137,8 @@ void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* ma
     
     send_client("What is ur Username: ", *peersoc);
     check_buffer(recv(*peersoc, &buffer[0], buffer_size, 0), *peersoc);
+
+    // Validate username length
     if(strlen(buffer) > MAX_USER_CHAR){
         send_client("Username should have max 8 char.", *peersoc);
         return;
@@ -141,15 +147,16 @@ void accept_client(int sfd, int *peersoc, char* buffer,int buffer_size, char* ma
     printf("Accepted with filedescriptor of requesting socket %d \n", *peersoc);
     receive_message(*peersoc,buffer,BUFFER_SIZE, mail_dir); 
 }
-
+// Handle communication for the connected user (until "QUIT")
 void receive_message(int peersoc, char* buffer, int buflen, char* mail_dir){
     char *current_user = malloc(strlen(buffer) + 1 + 1);
     strcpy(current_user, buffer);
     trim(current_user);
-    // send_client("Option (SEND | DEL | READ | LIST | QUIT)", peersoc);
+
+    // Communication loop until user quits
     while(communication(peersoc,buffer,buflen, mail_dir, current_user) == 0);
 }
-
+// Main communication logic: present options and handle user commands
 int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char* current_user)
 {
     memset(buffer, 0, buffersize);
@@ -158,6 +165,8 @@ int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char
     char option[BUFFER_SIZE];
     strcpy(option,buffer);
     trim(option);
+
+    // Match user command and call the corresponding function
     for(int i = 0; i < sizeof(options)/sizeof(options[0]); i++){
         if(strcasecmp(option, options[i].name) == 0){
             options[i].func(buffer, consfd, mail_dir, current_user);
@@ -167,13 +176,13 @@ int communication(int consfd, char *buffer, int buffersize, char* mail_dir, char
     send_client("Invalid option", consfd);
     return 0;
 }
-
+// Function to get the User directory using the maildir and the Username
 char* get_user_dir(char* mail_dir, char* username){
     char *mail_path = malloc(strlen(mail_dir) + strlen(username) + 2);
     sprintf(mail_path, "%s/%s", mail_dir, username);
     return mail_path;
 }
-
+// Trim trailing newline or spaces from input
 void trim(char *input)
 {
     if(input == NULL) return;
@@ -185,7 +194,7 @@ void trim(char *input)
         input[len - 2] = '\0';
     }
 }
-
+// Function to tokenize the message and save it in the send_obj array
 int tokenize_message(char* buffer, char** send_obj, int times) {
     if(buffer[0]== '\n'){
         return 1;
@@ -200,6 +209,7 @@ int tokenize_message(char* buffer, char** send_obj, int times) {
     if (tokens == NULL){
         return 1;
     }
+    // trim and tokenize the message according to \n
     for (int i = 0; i < times && tokens != NULL; i++) {
         trim(tokens);
         send_obj[i] = tokens;
@@ -207,7 +217,7 @@ int tokenize_message(char* buffer, char** send_obj, int times) {
     }
     return 0;
 }
-
+// Function to Handle "SEND" command: receive and save a message from the user
 void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_user)
 {
     // Receive Message
@@ -219,42 +229,45 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
             break; 
         }
     };
+    int body_length = 4;
     char *send_obj[4]  = {'\0'};
-    if(tokenize_message(buffer, send_obj, 3) == 1){
+    // Handle the first user inputs (Sender,Receiver,Subject).
+    if(tokenize_message(buffer, send_obj, body_length -1) == 1){
         send_client("ERR", consfd);
         return;
     }
-    for(int i = 0; i < 3; i++)
+    for(int i = 0; i < body_length -1; i++)
     {
         if(send_obj[i] == NULL)
         {
-            send_client("Wixxer", consfd);
+            send_client("ERR", consfd);
             return;
         }
     }
+    // Handle the message from the User
     char *tokens = strtok(buffer, "\n");
-    for (int i = 0; i < 2 && tokens != NULL; i++) {
-        tokens = strtok(NULL, "\n");  // Überspringe die ersten 3 Tokens
+    for (int i = 0; i < body_length - 2 && tokens != NULL; i++) {
+        tokens = strtok(NULL, "\n");  // to skip the first 3 user inputs
     }
-    char *full_message = strtok(NULL, "");  // Der Rest des Strings ab dem vierten Token
+    char *full_message = strtok(NULL, "");
     if (full_message == NULL) {
         send_client("ERR", consfd);
         return;
     }
 
-    // Entferne das letzte Zeichen, falls es ein . ist
+    // Remove the point at the End of the String
     size_t len = strlen(full_message);
     if (len > 0 && (full_message[len - 2] == '.')) {
         full_message[len - 2] = '\0';  
     }
-
+    // Save the full Send message as mail_body struct
     Mail_Body mail_body = {
         sender: send_obj[0],
         receiver: send_obj[1],
         subject: send_obj[2],
         message: full_message
     };
-
+    // Check if the sender is the logged user
     if(strcasecmp(mail_body.sender, current_user) != 0 || strlen(mail_body.receiver) > MAX_USER_CHAR){
         
         send_client("ERR", consfd);
@@ -263,7 +276,7 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
     save_message(mail_body, consfd, mail_dir);
     send_client("OK", consfd);
 }
-
+// Function to send the message to the corresponding socket
 void send_client(char* message, int consfd) {
     int message_length = strlen(message);
     char *new = malloc(message_length + 2);
@@ -276,13 +289,13 @@ void send_client(char* message, int consfd) {
     send(consfd, new, strlen(message), 0); // the message it self
     free(new);
 }
-
+// Function to quit and close the corresponding socket
 void handle_quit_message(char* buffer, int consfd, char* mail_dir, char* current_user){
     printf("End connection with client. \n");
     close(consfd);
     exit(0);
 }
-
+// Function to count the number of messages 
 int get_messages_count(char** messages){
     int count = 0;
     while (messages[count] != NULL) {
@@ -290,14 +303,13 @@ int get_messages_count(char** messages){
     }
     return count;
 }
-
+// Function to get the Fullpath to save the message in (Root,Username directory)
 char* get_full_path(char* root, char* fileName){
     char *path = malloc(strlen(root) + strlen(fileName) + 4); // +4 for slashes and null terminator
     sprintf(path, "%s/%s", root, fileName);
     return path;
 }
-
-
+// Function to Handle "list" command: receive and return the messages from the user directory
 void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current_user)
 {
     check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0), consfd);
@@ -308,7 +320,7 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
     if (messages != NULL) {
         count = get_messages_count(messages);
     }
-
+    // Check the number of messages in the User directory for the given username and send it
     char *number_of_messages = malloc(sizeof(int) * (count > 0 ? count:1) + strlen("Messages"));
     sprintf(number_of_messages, "%d Messages", count);
     send_client(number_of_messages, consfd);
@@ -326,8 +338,7 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
                 exit(EXIT_FAILURE);
             }
             // Concatenate each message into long_message
-            long_message[0] = '\0';   // Start with an empty string
-            // strcpy(long_message, "\n");
+            long_message[0] = '\0';  // Start with an empty string
             for (int i = 0; messages[i] != NULL; i++) {
                 char *message = malloc(snprintf(NULL, 0, "%d: %s\n", i + 1, messages[i]) + 1);
                 snprintf(message, snprintf(NULL, 0, "%d: %s\n", i + 1, messages[i]) + 1, "%d: %s\n", i + 1, messages[i]);
@@ -343,7 +354,7 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
     free(messages);
 
 }
-
+// Function save all messages in char array and return it 
 char** list_message(char* receiver_path, char* sender) {
     trim(sender);
     char** messages = NULL;
@@ -378,8 +389,7 @@ char** list_message(char* receiver_path, char* sender) {
         messages[cnt] = NULL;
     return messages;
 }
-
-
+// Function to Handle "del" command: receive and delete the messages from the user directory
 void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_user){
     if (check_buffer(recv(consfd, buffer, BUFFER_SIZE, 0), consfd) == -1 || check_buffer(recv(consfd, buffer + strlen(buffer), BUFFER_SIZE, 0), consfd) == -1) {
         printf("cannot receive due to %d \n", errno);
@@ -407,9 +417,8 @@ void handle_del_message(char* buffer, int consfd, char* mail_dir, char* current_
 
     free(path_of_index);
 }
-
+// Function to Handle "read" command: receive and sending the messages from the user directory
 void handle_read_message(char* buffer, int consfd, char* mail_dir, char* current_user){
-
     memset(buffer, 0, BUFFER_SIZE);
     int size = check_buffer(recv(consfd, &buffer[0],BUFFER_SIZE,0), consfd);
     check_buffer(recv(consfd, &buffer[size],BUFFER_SIZE,0), consfd);
@@ -430,12 +439,11 @@ void handle_read_message(char* buffer, int consfd, char* mail_dir, char* current
     read_file(file, consfd);
     free(path_of_index);
 }
-
+// Function to get the path of a message according to the message index
 char* get_path_of_index(char** send_obj, int consfd, char* mail_dir) {
     char **messages = list_message(mail_dir, send_obj[0]);
     int message_index = atoi(send_obj[1]) - 1;
     if (!messages || message_index < 0 || message_index >= get_messages_count(messages)) {
-        // free(receiver_path);
         if (messages) free(messages);
         return NULL;
     }
@@ -444,19 +452,17 @@ char* get_path_of_index(char** send_obj, int consfd, char* mail_dir) {
     
     for (int i = 0; messages[i]; i++) free(messages[i]);
     free(messages);
-    // free(receiver_path);
-    
     return full_path;
 }
-
+// Function used to read and print out the file
 void read_file(FILE* file, int consfd){
 
     char line[256];
     if (file != NULL) {
-        char buffer[BUFFER_SIZE] = "";  // Puffer, der alle Zeilen speichert
+        char buffer[BUFFER_SIZE] = "";  // Buffer that saves all lines of the file
         while (fgets(line, sizeof(line), file) != NULL) {
             if (strlen(line) > 0) {
-                strncat(buffer, line, sizeof(buffer) - strlen(buffer) - 1);  // Platz im Puffer prüfen
+                strncat(buffer, line, sizeof(buffer) - strlen(buffer) - 1);  // check the size of buffer
             }
         }
         
@@ -468,12 +474,9 @@ void read_file(FILE* file, int consfd){
         exit(EXIT_FAILURE);
     }
 }
-
+// Function to save the message to a file in the user's mail directory
 void save_message(Mail_Body mail_body, int consfd,  char* mail_dir) {
-    //TEST
-    printf("am in save message\n");
     FILE *fptr;
-   
     int root_dir_len = strlen(mail_dir);
     int dir_len = strlen(mail_body.receiver);
     int path_sender_len = strlen(mail_body.sender);
