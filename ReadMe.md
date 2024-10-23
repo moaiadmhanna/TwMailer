@@ -26,7 +26,7 @@ Here are the possible user inputs for the TwMailer system:
      ```
      
 ```LIST```: List all messages in your own inbox (directory).
-   - **Format**: `<username>` (to list your own messages) or `All` (to list messages from all users)
+   - **Format**: `<username>` (to list a specific message) or `All` (to list all messages)
 
 ```READ```: Read a specific message from a specific user in your own directory.
    - **Format**:
