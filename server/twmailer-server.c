@@ -58,7 +58,10 @@ option options[] = {
 int main(const int argc, char *argv[]){
     char* port = argv[1];
     char* mail_dir = argv[2];
-   
+    DIR* dir = opendir(mail_dir);
+    if(!dir)
+        mkdir(mail_dir, 0777);
+
     int sfd;
     create_socket(&sfd);
 
@@ -187,7 +190,12 @@ int tokenize_message(char* buffer, char** send_obj, int times) {
     if(buffer[0]== '\n'){
         return 1;
     }
-    char *tokens = strtok(buffer, "\n");
+
+    int buffer_length = strlen(buffer);
+    char *copied_buffer = malloc(buffer_length + 2);
+    strcpy(copied_buffer, buffer);
+
+    char *tokens = strtok(copied_buffer, "\n");
     trim(tokens);
     if (tokens == NULL){
         return 1;
@@ -211,27 +219,40 @@ void handle_send_client(char* buffer, int consfd, char* mail_dir, char* current_
             break; 
         }
     };
-
-    // Tokenize Message
-    char *send_obj[5]  = {'\0'};
-    if(tokenize_message(buffer, send_obj, 5) == 1){
+    char *send_obj[4]  = {'\0'};
+    if(tokenize_message(buffer, send_obj, 3) == 1){
         send_client("ERR", consfd);
         return;
     }
-   
-    for(int i = 0; i < 5; i++)
+    for(int i = 0; i < 3; i++)
     {
         if(send_obj[i] == NULL)
         {
-            send_client("Invalid Argument", consfd);
+            send_client("Wixxer", consfd);
             return;
         }
     }
+    char *tokens = strtok(buffer, "\n");
+    for (int i = 0; i < 2 && tokens != NULL; i++) {
+        tokens = strtok(NULL, "\n");  // Überspringe die ersten 3 Tokens
+    }
+    char *full_message = strtok(NULL, "");  // Der Rest des Strings ab dem vierten Token
+    if (full_message == NULL) {
+        send_client("ERR", consfd);
+        return;
+    }
+
+    // Entferne das letzte Zeichen, falls es ein . ist
+    size_t len = strlen(full_message);
+    if (len > 0 && (full_message[len - 2] == '.')) {
+        full_message[len - 2] = '\0';  
+    }
+
     Mail_Body mail_body = {
         sender: send_obj[0],
         receiver: send_obj[1],
         subject: send_obj[2],
-        message: send_obj[3]
+        message: full_message
     };
 
     if(strcasecmp(mail_body.sender, current_user) != 0 || strlen(mail_body.receiver) > MAX_USER_CHAR){
@@ -306,7 +327,7 @@ void handle_list_message(char* buffer, int consfd, char* mail_dir, char* current
             }
             // Concatenate each message into long_message
             long_message[0] = '\0';   // Start with an empty string
-            strcpy(long_message, "\n");
+            // strcpy(long_message, "\n");
             for (int i = 0; messages[i] != NULL; i++) {
                 char *message = malloc(snprintf(NULL, 0, "%d: %s\n", i + 1, messages[i]) + 1);
                 snprintf(message, snprintf(NULL, 0, "%d: %s\n", i + 1, messages[i]) + 1, "%d: %s\n", i + 1, messages[i]);

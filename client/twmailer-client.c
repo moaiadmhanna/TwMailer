@@ -103,8 +103,6 @@ void recv_from_server(int sockfd, char *buffer, int buffer_size) {
         perror("Failed to receive message from server");
         exit(EXIT_FAILURE);
     }
-    // printf("bytes Recived : %d\n",bytes_received);
-    // buffer[bytes_received + 1] = '\0';
     printf("<< %s\n", buffer);
 }
 
@@ -191,16 +189,14 @@ enum SENDING_STATE delete_message(int sockfd, char* input, char* buffer){
 
 enum SENDING_STATE send_message(int sockfd, char* input, char* buffer){
     // Send a message
-    char *body[] = {"Sender >>", "Receiver >>", "Subject >>", "Message >>", NULL};
+    char *body[] = {"Sender >>", "Receiver >>", "Subject >>", NULL};
     prepare_and_send_messages(body, sockfd, input);
     while(1)
     {
         input_client(">>", input, BUFFER_SIZE);
-        if(strcasecmp(input,".\n") == 0)break;
         send_to_server(sockfd, input);
+        if(strcasecmp(input, ".\n") == 0) break;
     }
-    printf("Input: %s", input);
-    send_to_server(sockfd, input);
     return Success;
 }
 
